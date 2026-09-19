@@ -1,0 +1,68 @@
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+**/application-local.properties
+**/application-local.yml
+**/application-local.yaml
+credentials.json
+service-account*.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+
+# Generated output
+.gradle/
+.kotlin/
+**/build/
+node_modules/
+dist/
+coverage/
+*.class
+*.jar
+*.war
+*.log
+*.hprof
+hs_err_pid*
+replay_pid*
+*.tsbuildinfo
+
+# Keep the Gradle Wrapper JAR in version control
+!gradle/wrapper/gradle-wrapper.jar
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+
+### Windows ###
+Thumbs.db
