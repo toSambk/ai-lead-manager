@@ -1,3 +1,3 @@
 # Telegram module
 
-This module will handle Telegram Bot API updates, bot commands, and outgoing messages. The bot token will be supplied through an environment variable.
+This module verifies signed Telegram Mini App `initData` using the bot token supplied through `TELEGRAM_BOT_TOKEN`. It checks the HMAC, timestamp, and user identity without trusting `initDataUnsafe`. Bot API updates, commands, and outgoing messages remain planned.

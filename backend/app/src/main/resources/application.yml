@@ -7,3 +7,14 @@ spring:
     password: ${POSTGRES_PASSWORD}
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
+  session:
+    jdbc:
+      initialize-schema: never
+server:
+  servlet:
+    session:
+      timeout: 2h
+      cookie:
+        http-only: true
+        secure: ${SESSION_COOKIE_SECURE:true}
+        same-site: lax

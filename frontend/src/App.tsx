@@ -1,10 +1,17 @@
 import { useEffect, useState } from 'react'
+import { authenticateWithTelegram, type CurrentUser } from './api'
+import { LeadForm } from './LeadForm'
 import './App.css'
 
 type BackendStatus = 'checking' | 'online' | 'offline'
+type AuthenticationStatus = 'checking' | 'outside-telegram' | 'authenticated' | 'failed'
 
 function App() {
   const [backendStatus, setBackendStatus] = useState<BackendStatus>('checking')
+  const [authenticationStatus, setAuthenticationStatus] = useState<AuthenticationStatus>(
+    () => window.Telegram?.WebApp?.initData ? 'checking' : 'outside-telegram',
+  )
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -22,6 +29,24 @@ function App() {
     return () => controller.abort()
   }, [])
 
+  useEffect(() => {
+    const miniApp = window.Telegram?.WebApp
+    if (!miniApp?.initData) return
+    miniApp.ready()
+    let active = true
+    authenticateWithTelegram(miniApp.initData)
+      .then((user) => {
+        if (active) {
+          setCurrentUser(user)
+          setAuthenticationStatus('authenticated')
+        }
+      })
+      .catch(() => {
+        if (active) setAuthenticationStatus('failed')
+      })
+    return () => { active = false }
+  }, [])
+
   const statusLabel = {
     checking: 'Checking backend…',
     online: 'Backend available',
@@ -33,33 +58,33 @@ function App() {
       <header className="header">
         <div className="brand-mark" aria-hidden="true">AI</div>
         <span>Lead Manager</span>
-      </header>
-
-      <section className="intro">
-        <p className="eyebrow">Project skeleton</p>
-        <h1>Telegram leads in one place</h1>
-        <p className="description">
-          The customer form and manager workspace will appear here. For now,
-          this screen checks the connection to the Kotlin backend.
-        </p>
         <div className={`status status--${backendStatus}`} role="status">
           <span className="status-dot" aria-hidden="true" />
           {statusLabel}
         </div>
+      </header>
+
+      <section className="intro">
+        <p className="eyebrow">Start a conversation</p>
+        <h1>Have a project in mind?</h1>
+        <p className="description">
+          Tell us what you need and we will review your request.
+        </p>
+        <p className="auth-message" role="status">
+          {authenticationStatus === 'checking' && 'Checking Telegram sign-in…'}
+          {authenticationStatus === 'outside-telegram' && 'Open this app in Telegram to sign in.'}
+          {authenticationStatus === 'authenticated' && `Signed in as ${currentUser?.displayName}`}
+          {authenticationStatus === 'failed' && 'Telegram sign-in failed. Reopen the Mini App and try again.'}
+        </p>
       </section>
 
-      <section className="modules" aria-label="Planned screens">
-        <article className="module-card">
-          <span className="module-number">01</span>
-          <h2>Customer</h2>
-          <p>Lead form, follow-up questions, and status tracking.</p>
-        </article>
-        <article className="module-card">
-          <span className="module-number">02</span>
-          <h2>Manager</h2>
-          <p>Lead list, detail view, assignment, and history.</p>
-        </article>
-      </section>
+      {authenticationStatus === 'authenticated' && currentUser?.role === 'CUSTOMER' && <LeadForm />}
+      {authenticationStatus === 'authenticated' && currentUser?.role !== 'CUSTOMER' && (
+        <section className="lead-panel">
+          <h2>Welcome, {currentUser?.displayName}</h2>
+          <p>The manager workspace is being prepared.</p>
+        </section>
+      )}
     </main>
   )
 }

@@ -6,7 +6,7 @@ This document defines the target requirements, the scope of the first release, a
 
 ## Current implementation
 
-The monorepo skeleton is in place: five Kotlin Gradle modules, a React/TypeScript frontend, and a PostgreSQL Compose configuration. The backend connects to PostgreSQL, runs the first Liquibase migration for the `"AI_LEAD_MANAGER"` schema, and provides Spring Data JDBC repositories for users, service categories, and leads. HTTP behavior is still limited to GET /api/system; the frontend checks backend connectivity. Lead intake APIs, Telegram integration, and AI are still planned.
+The monorepo skeleton is in place: five Kotlin Gradle modules, a React/TypeScript frontend, and a Compose configuration for the backend and PostgreSQL. The backend connects to PostgreSQL, runs Liquibase migrations for the foundation schema and JDBC sessions, and provides Spring Data JDBC repositories for users, service categories, and leads. Telegram Mini App `initData` verification, session login, `/api/me`, logout, `GET /api/categories`, and `POST /api/leads` are implemented. The frontend signs in automatically inside Telegram and lets a customer submit a lead and see its reference. Lead listing, bot commands, outgoing messages, and AI processing remain planned; their routes return `501 Not Implemented`.
 
 ~~~text
 ai-lead-manager/
@@ -14,46 +14,59 @@ ai-lead-manager/
 │   ├── app/          # Spring Boot entry point, REST API, module wiring
 │   ├── core/         # Lead model and business rules
 │   ├── persistence/  # Liquibase migration and Spring Data JDBC repositories
-│   ├── telegram/     # Bot integration (planned)
+│   ├── telegram/     # Mini App identity verification; bot integration planned
 │   └── ai/           # Lead analysis (planned)
 ├── frontend/         # React + TypeScript, separate npm project
 ├── infra/            # Docker Compose
 ├── docs/             # Architecture notes
 ├── gradle/           # Gradle Wrapper
+├── scripts/          # PowerShell launch helpers for local development
 ├── settings.gradle.kts
 └── README.md
 ~~~
 
-The backend modules produce one Spring Boot service. The core module has no integration dependencies; persistence, telegram, and ai depend on core; app wires them together. The frontend lives in the same repository and is built with npm. See [module architecture](docs/architecture.md) and the [preliminary HTTP API](docs/api.md). The planned API routes currently return `501 Not Implemented`; only `GET /api/system` is functional.
+The backend modules produce one Spring Boot service. The core module has no integration dependencies; persistence, telegram, and ai depend on core; app wires them together. The frontend lives in the same repository and is built with npm. See [module architecture](docs/architecture.md) and the [preliminary HTTP API](docs/api.md).
 
-### Run the current skeleton
+### Run locally
 
-Install JDK 21 and a Node.js LTS release. A system Gradle installation is unnecessary because the repository includes a pinned Gradle Wrapper. Copy `.env.example` to `.env` and set `POSTGRES_PASSWORD` before running the commands below. `.env` is ignored by Git.
+Install Docker Desktop and a Node.js LTS release. Copy `.env.example` to `.env` and set `POSTGRES_PASSWORD`. Set `TELEGRAM_BOT_TOKEN` to authenticate inside Telegram; without it, the auth endpoint returns `503 Service Unavailable`. `.env` is ignored by Git. Set `SESSION_COOKIE_SECURE=true` in `.env` when accessing the Mini App through an HTTPS tunnel; keep it `false` only for plain local HTTP.
+
+From the repository root, build and start PostgreSQL and the backend together:
 
 ~~~powershell
-# From the repository root, after setting POSTGRES_PASSWORD in .env
-docker compose --env-file .env -p ai-lead-manager -f infra/compose.yaml up -d --wait
-$env:POSTGRES_PASSWORD = ((Get-Content .env | Where-Object { $_ -match '^POSTGRES_PASSWORD=' }) -replace '^POSTGRES_PASSWORD=', '')
-.\gradlew.bat :backend:app:bootRun
-
-# In a second terminal
-cd frontend
-npm.cmd install
-npm.cmd run dev
+docker compose --env-file .env -p ai-lead-manager -f infra/compose.yaml up -d --build
 ~~~
 
-Open the URL printed by Vite, usually http://localhost:5173. When the backend is running, the frontend displays “Backend available”. The sample API is at http://localhost:8080/api/system; Spring Boot health is at http://localhost:8080/actuator/health.
+The backend image builds the application with the repository's Gradle Wrapper and runs it on Java 21. Compose passes database settings and the Telegram bot token from `.env` to the container; the backend connects to the `postgres` service by its Compose hostname. The API is available at http://localhost:8080, bound only to the local machine. Check startup with `docker compose --env-file .env -p ai-lead-manager -f infra/compose.yaml logs -f backend`.
 
-The app reads the password from its process environment. On startup, Liquibase creates the quoted PostgreSQL schema `"AI_LEAD_MANAGER"`, three foundation tables, indexes, constraints, and two sample service categories. Liquibase's `DATABASECHANGELOG` tables live in `public`.
+In another terminal, start the frontend from the repository root:
+
+~~~powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-frontend.ps1
+~~~
+
+The frontend script runs `npm.cmd ci` when dependencies are absent. When testing through a temporary HTTPS tunnel, restart it with the hostname shown by the tunnel, for example:
+
+~~~powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-frontend.ps1 -AllowedHost example.trycloudflare.com
+~~~
+
+Pass only the hostname, without `https://` or a path. The `-ExecutionPolicy Bypass` flag applies only to the launched PowerShell process; it does not change the system policy.
+
+To run the backend directly instead, install JDK 21, start PostgreSQL locally or with `docker compose --env-file .env -p ai-lead-manager -f infra/compose.yaml up -d postgres`, and run `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-backend.ps1`. A system Gradle installation is unnecessary. Stop the Compose backend before starting the direct backend to free port 8080.
+
+Open the URL printed by Vite, usually http://localhost:5173. The frontend reports backend connectivity. Outside Telegram, it explains that Mini App sign-in is unavailable; the lead form appears only after Telegram sign-in with the `CUSTOMER` role. The sample API is at http://localhost:8080/api/system; Spring Boot health is at http://localhost:8080/actuator/health. A Telegram Mini App requires a public HTTPS URL for device testing.
+
+The app reads secrets from its process environment. On startup, Liquibase creates the quoted PostgreSQL schema `"AI_LEAD_MANAGER"`, three foundation tables, indexes, constraints, two sample service categories, and Spring Session tables in `public`. Liquibase's `DATABASECHANGELOG` tables also live in `public`.
 
 ~~~powershell
 docker compose --env-file .env -p ai-lead-manager -f infra/compose.yaml exec postgres psql -U ai_lead_manager -d ai_lead_manager -c '\dt "AI_LEAD_MANAGER".*'
 docker compose --env-file .env -p ai-lead-manager -f infra/compose.yaml exec postgres psql -U ai_lead_manager -d ai_lead_manager -c 'SELECT id, author, exectype FROM public.databasechangelog;'
 ~~~
 
-These commands require Docker Desktop. The backend now needs PostgreSQL to start; the frontend can still run without it but will show that the backend is unavailable.
+The Compose commands require Docker Desktop. The backend needs PostgreSQL to start; the frontend can still run without it but will show that the backend is unavailable.
 
-To run the repository integration test, start PostgreSQL with Compose, set `POSTGRES_PASSWORD` in the same PowerShell session as above, and run `.\gradlew.bat build` from the repository root. The test uses a transaction that rolls back its data. Without `POSTGRES_PASSWORD`, the database integration test is skipped.
+The integration tests start an isolated PostgreSQL container with Testcontainers and apply Liquibase migrations automatically. Run `.\gradlew.bat build` from the repository root, or run either integration test class from the IDE. Docker Desktop must be running; Compose, `.env`, and `POSTGRES_PASSWORD` are not needed for tests. The tests clean up their sample data and fail if Docker is unavailable.
 
 ## 1. Goal and primary workflow
 

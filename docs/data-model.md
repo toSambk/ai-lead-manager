@@ -1,6 +1,6 @@
 # Data model and persistence boundary
 
-This document defines the PostgreSQL schema. The foundation tables are implemented by Liquibase change set `001-foundation` in `backend/persistence/src/main/resources/db/changelog/changes/001-foundation.sql`. Later tables remain planned and should be added only when the related workflow is implemented.
+This document defines the PostgreSQL schema. The foundation tables are implemented by Liquibase change set `001-foundation`; JDBC session tables are implemented by `002-sessions` in `backend/persistence/src/main/resources/db/changelog/changes`. Later business tables remain planned and should be added only when the related workflow is implemented.
 
 The design follows the first release in [README.md](../README.md): one business, Telegram as the only inbound channel, and one Spring Boot service. PostgreSQL is the source of truth for leads and their history. The frontend never accesses it directly.
 
@@ -42,13 +42,14 @@ When customer-facing messages are implemented, represent draft, approval, and de
 
 `backend/app` supplies the datasource and migration configuration, wires repository implementations into use cases, authenticates the verified Telegram principal, and exposes HTTP endpoints. `backend/telegram` handles Telegram update parsing and outbound delivery; it uses core interfaces/use cases rather than issuing SQL. `backend/ai` invokes the AI provider and returns structured output for core validation.
 
-Repository operations now support saving a lead, finding one by ID or by ID plus customer ID, and listing all leads or a customer's leads with pagination. User and category lookup are also available. The Spring Data records keep foreign keys as IDs, so saving a lead does not cascade into users or categories. When the intake use case is built, persist user lookup/upsert and lead creation atomically. The API must derive `customer_id` from verified Telegram identity, never from an untrusted request field. A customer-scoped read includes the customer predicate in the database query; core authorization checks remain necessary.
+Repository operations now support saving a lead, finding one by ID or by ID plus customer ID, and listing all leads or a customer's leads with pagination. User and category lookup are also available. The Spring Data records keep foreign keys as IDs, so saving a lead does not cascade into users or categories. Login atomically upserts a Telegram user by `telegram_user_id` while preserving the existing role. Lead creation occurs in a later request using the session's internal user ID. The API derives `customer_id` from that authenticated session, never from an untrusted request field. A customer-scoped read includes the customer predicate in the database query; core authorization checks remain necessary.
 
 ## Migration sequence
 
-1. **V1 foundation (schema and repositories implemented):** Liquibase creates `users`, `service_categories`, and `leads`, including FKs, checks, indexes, and safe category seed data. The app configures the datasource and runs migrations at startup. Spring Data JDBC repository adapters provide storage. POST and GET lead API operations remain planned.
-2. **Conversation and manager work:** add messages and events with explicit transaction boundaries for lead changes.
-3. **Telegram reliability:** add update deduplication and outbound delivery state with unique keys.
-4. **AI:** add jobs and validated results with bounded retry/failure states.
+1. **V1 foundation (implemented):** Liquibase creates `users`, `service_categories`, and `leads`, including FKs, checks, indexes, and safe category seed data. Spring Data JDBC repository adapters provide storage. `POST /api/leads` uses a verified session; GET lead API operations remain planned.
+2. **V2 sessions (implemented):** Liquibase creates `public.spring_session` and `public.spring_session_attributes`. Spring Session JDBC stores server-side sessions there; Spring Security loads the user's current role from `users` on each request.
+3. **Conversation and manager work:** add messages and events with explicit transaction boundaries for lead changes.
+4. **Telegram reliability:** add update deduplication and outbound delivery state with unique keys.
+5. **AI:** add jobs and validated results with bounded retry/failure states.
 
 Each migration is forward-only and versioned. Do not place schema creation in application startup code or expose database models directly as API responses.

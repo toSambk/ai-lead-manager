@@ -9,12 +9,16 @@ import dev.aileadmanager.core.User
 import dev.aileadmanager.core.UserRepository
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.data.domain.PageRequest
 import org.springframework.data.domain.Sort
 import org.springframework.stereotype.Repository
 
 @Repository
-internal class JdbcUserRepository(private val records: SpringUserRepository) : UserRepository {
+internal class JdbcUserRepository(
+    private val records: SpringUserRepository,
+    private val jdbc: JdbcTemplate,
+) : UserRepository {
     override fun save(user: User): User {
         val now = Instant.now().truncatedTo(ChronoUnit.MICROS)
         return records.save(UserRecord(
@@ -26,6 +30,29 @@ internal class JdbcUserRepository(private val records: SpringUserRepository) : U
             updatedAt = now,
         )).toDomain()
     }
+
+    override fun upsertTelegramProfile(telegramUserId: Long, displayName: String): User =
+        requireNotNull(jdbc.queryForObject(
+            """
+            INSERT INTO "AI_LEAD_MANAGER".users (telegram_user_id, role, display_name)
+            VALUES (?, 'CUSTOMER', ?)
+            ON CONFLICT (telegram_user_id) DO UPDATE
+            SET display_name = EXCLUDED.display_name, updated_at = now()
+            RETURNING id, telegram_user_id, role, display_name, created_at, updated_at
+            """.trimIndent(),
+            { result, _ ->
+                User(
+                    id = result.getLong("id"),
+                    telegramUserId = result.getLong("telegram_user_id"),
+                    role = dev.aileadmanager.core.UserRole.valueOf(result.getString("role")),
+                    displayName = result.getString("display_name"),
+                    createdAt = result.getTimestamp("created_at").toInstant(),
+                    updatedAt = result.getTimestamp("updated_at").toInstant(),
+                )
+            },
+            telegramUserId,
+            displayName,
+        ))
 
     override fun findById(id: Long): User? = records.findById(id).orElse(null)?.toDomain()
 
