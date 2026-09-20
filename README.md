@@ -6,14 +6,14 @@ This document defines the target requirements, the scope of the first release, a
 
 ## Current implementation
 
-The monorepo skeleton is in place: five Kotlin Gradle modules, a React/TypeScript frontend, and a PostgreSQL Compose configuration. The implemented behavior is limited to a Spring Boot application, GET /api/system, an initial lead status type, and a frontend screen that checks backend connectivity. Lead intake, Telegram integration, persistence, and AI are still planned.
+The monorepo skeleton is in place: five Kotlin Gradle modules, a React/TypeScript frontend, and a PostgreSQL Compose configuration. The backend connects to PostgreSQL, runs the first Liquibase migration for the `"AI_LEAD_MANAGER"` schema, and provides Spring Data JDBC repositories for users, service categories, and leads. HTTP behavior is still limited to GET /api/system; the frontend checks backend connectivity. Lead intake APIs, Telegram integration, and AI are still planned.
 
 ~~~text
 ai-lead-manager/
 ├── backend/
 │   ├── app/          # Spring Boot entry point, REST API, module wiring
 │   ├── core/         # Lead model and business rules
-│   ├── persistence/  # PostgreSQL and migrations (planned)
+│   ├── persistence/  # Liquibase migration and Spring Data JDBC repositories
 │   ├── telegram/     # Bot integration (planned)
 │   └── ai/           # Lead analysis (planned)
 ├── frontend/         # React + TypeScript, separate npm project
@@ -24,17 +24,19 @@ ai-lead-manager/
 └── README.md
 ~~~
 
-The backend modules produce one Spring Boot service. The core module has no integration dependencies; persistence, telegram, and ai depend on core; app wires them together. The frontend lives in the same repository and is built with npm. See [module architecture](docs/architecture.md).
+The backend modules produce one Spring Boot service. The core module has no integration dependencies; persistence, telegram, and ai depend on core; app wires them together. The frontend lives in the same repository and is built with npm. See [module architecture](docs/architecture.md) and the [preliminary HTTP API](docs/api.md). The planned API routes currently return `501 Not Implemented`; only `GET /api/system` is functional.
 
 ### Run the current skeleton
 
-Install JDK 21 and a Node.js LTS release. A system Gradle installation is unnecessary because the repository includes a pinned Gradle Wrapper.
+Install JDK 21 and a Node.js LTS release. A system Gradle installation is unnecessary because the repository includes a pinned Gradle Wrapper. Copy `.env.example` to `.env` and set `POSTGRES_PASSWORD` before running the commands below. `.env` is ignored by Git.
 
 ~~~powershell
-# Terminal 1, from the repository root
+# From the repository root, after setting POSTGRES_PASSWORD in .env
+docker compose --env-file .env -p ai-lead-manager -f infra/compose.yaml up -d --wait
+$env:POSTGRES_PASSWORD = ((Get-Content .env | Where-Object { $_ -match '^POSTGRES_PASSWORD=' }) -replace '^POSTGRES_PASSWORD=', '')
 .\gradlew.bat :backend:app:bootRun
 
-# Terminal 2
+# In a second terminal
 cd frontend
 npm.cmd install
 npm.cmd run dev
@@ -42,13 +44,16 @@ npm.cmd run dev
 
 Open the URL printed by Vite, usually http://localhost:5173. When the backend is running, the frontend displays “Backend available”. The sample API is at http://localhost:8080/api/system; Spring Boot health is at http://localhost:8080/actuator/health.
 
-PostgreSQL is not connected to the application yet. When local storage is needed, copy .env.example to .env, set POSTGRES_PASSWORD in .env, and run this command from the repository root:
+The app reads the password from its process environment. On startup, Liquibase creates the quoted PostgreSQL schema `"AI_LEAD_MANAGER"`, three foundation tables, indexes, constraints, and two sample service categories. Liquibase's `DATABASECHANGELOG` tables live in `public`.
 
 ~~~powershell
-docker compose --env-file .env -f infra/compose.yaml up -d
+docker compose --env-file .env -p ai-lead-manager -f infra/compose.yaml exec postgres psql -U ai_lead_manager -d ai_lead_manager -c '\dt "AI_LEAD_MANAGER".*'
+docker compose --env-file .env -p ai-lead-manager -f infra/compose.yaml exec postgres psql -U ai_lead_manager -d ai_lead_manager -c 'SELECT id, author, exectype FROM public.databasechangelog;'
 ~~~
 
-This command requires a working Docker Desktop installation. The current backend and frontend can run without PostgreSQL.
+These commands require Docker Desktop. The backend now needs PostgreSQL to start; the frontend can still run without it but will show that the backend is unavailable.
+
+To run the repository integration test, start PostgreSQL with Compose, set `POSTGRES_PASSWORD` in the same PowerShell session as above, and run `.\gradlew.bat build` from the repository root. The test uses a transaction that rolls back its data. Without `POSTGRES_PASSWORD`, the database integration test is skipped.
 
 ## 1. Goal and primary workflow
 
@@ -119,11 +124,11 @@ Planned stack:
 
 - **Backend:** Kotlin, Spring Boot, Gradle, REST API, and Telegram Bot API integration.
 - **Frontend:** React and TypeScript in one Mini App with customer and manager views.
-- **Database:** PostgreSQL with versioned schema migrations.
+- **Database:** PostgreSQL with Liquibase versioned schema migrations.
 - **Local environment:** Docker Compose for PostgreSQL and later application services.
 - **AI:** An isolated provider interface and a local stub implementation.
 
-The first release uses one backend service with the app, core, persistence, telegram, and ai modules. Planned primary data objects are users, leads, lead messages, lead events, AI results, and AI jobs. The exact schema and API contracts will be refined before each implementation phase and recorded in migrations and API documentation.
+The first release uses one backend service with the app, core, persistence, telegram, and ai modules. The first migration creates users, service categories, and leads; Spring Data JDBC provides their storage operations. Lead messages, lead events, Telegram update records, AI results, and AI jobs remain planned. The [data model](docs/data-model.md) defines the schema and persistence module boundary; migrations and API documentation will record implemented contracts as each phase progresses.
 
 ### Access and reliability
 
