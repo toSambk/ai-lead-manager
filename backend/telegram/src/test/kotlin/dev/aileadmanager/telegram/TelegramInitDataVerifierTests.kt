@@ -25,10 +25,19 @@ class TelegramInitDataVerifierTests {
     }
 
     @Test
+    fun `accepts signed init data with a third-party signature`() {
+        val verified = verifier.verify(signedData(signature = "synthetic-signature"))
+
+        assertEquals(987654321L, verified.telegramUserId)
+    }
+
+    @Test
     fun `rejects a modified user`() {
         val altered = signedData().replace("Cafe", "Fake")
 
-        assertFailsWith<InvalidTelegramInitData> { verifier.verify(altered) }
+        val exception = assertFailsWith<InvalidTelegramInitData> { verifier.verify(altered) }
+
+        assertEquals("Telegram init data hash does not match", exception.message)
     }
 
     @Test
@@ -48,12 +57,13 @@ class TelegramInitDataVerifierTests {
         assertFailsWith<InvalidTelegramInitData> { verifier.verify(signedData(now.plusSeconds(61))) }
     }
 
-    private fun signedData(authDate: Instant = now): String {
-        val fields = mapOf(
-            "auth_date" to authDate.epochSecond.toString(),
-            "user" to """{"id":987654321,"first_name":"Cafe","last_name":"Owner"}""",
-            "query_id" to "example",
-        )
+    private fun signedData(authDate: Instant = now, signature: String? = null): String {
+        val fields = buildMap {
+            put("auth_date", authDate.epochSecond.toString())
+            put("user", """{"id":987654321,"first_name":"Cafe","last_name":"Owner"}""")
+            put("query_id", "example")
+            signature?.let { put("signature", it) }
+        }
         val checkString = fields.toSortedMap().entries.joinToString("\n") { "${it.key}=${it.value}" }
         val secret = hmac("WebAppData".toByteArray(StandardCharsets.UTF_8), "123456:example")
         val hash = HexFormat.of().formatHex(hmac(secret, checkString))

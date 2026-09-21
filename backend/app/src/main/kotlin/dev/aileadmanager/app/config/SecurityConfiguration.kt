@@ -32,7 +32,7 @@ class SecurityConfiguration {
         }
         http.authorizeHttpRequests { rules ->
             rules.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-            rules.requestMatchers(HttpMethod.GET, "/api/system", "/actuator/health", "/api/auth/csrf").permitAll()
+            rules.requestMatchers(HttpMethod.GET, "/api/system", "/actuator/health", "/api/auth/csrf", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
             rules.requestMatchers(HttpMethod.POST, "/api/auth/telegram").permitAll()
             rules.requestMatchers("/api/telegram/webhook").permitAll()
             rules.requestMatchers("/api/admin/**").hasRole("ADMIN")

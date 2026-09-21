@@ -45,7 +45,15 @@ In another terminal, start the frontend from the repository root:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-frontend.ps1
 ~~~
 
-The frontend script runs `npm.cmd ci` when dependencies are absent. When testing through a temporary HTTPS tunnel, restart it with the hostname shown by the tunnel, for example:
+The frontend script runs `npm.cmd ci` when dependencies are absent. Use a temporary HTTPS tunnel to test the Mini App from Telegram.
+
+Start the Cloudflare Quick Tunnel in a separate terminal. The helper expects `cloudflared.exe` at `C:\Tools\cloudflared\cloudflared.exe` and forwards the generated public HTTPS URL to Vite on port 5173:
+
+~~~powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-cloudflare-tunnel.ps1
+~~~
+
+After the tunnel prints its random `trycloudflare.com` URL, restart the frontend with that exact hostname:
 
 ~~~powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-frontend.ps1 -AllowedHost example.trycloudflare.com

@@ -15,7 +15,7 @@ import tools.jackson.databind.ObjectMapper
 
 data class VerifiedTelegramUser(val telegramUserId: Long, val displayName: String)
 
-class InvalidTelegramInitData : RuntimeException("Invalid Telegram Mini App data")
+class InvalidTelegramInitData(message: String = "Invalid Telegram Mini App data") : RuntimeException(message)
 class TelegramAuthUnavailable : RuntimeException("Telegram bot token is not configured")
 
 class TelegramInitDataVerifier(
@@ -38,12 +38,14 @@ class TelegramInitDataVerifier(
         if (receivedHash.size != 32) throw InvalidTelegramInitData()
 
         val checkString = fields.entries.asSequence()
-            .filter { it.key != "hash" && it.key != "signature" }
+            .filter { it.key != "hash" }
             .sortedBy { it.key }
             .joinToString("\n") { "${it.key}=${it.value}" }
         val secret = hmac("WebAppData".toByteArray(StandardCharsets.UTF_8), botToken)
         val expectedHash = hmac(secret, checkString)
-        if (!MessageDigest.isEqual(receivedHash, expectedHash)) throw InvalidTelegramInitData()
+        if (!MessageDigest.isEqual(receivedHash, expectedHash)) {
+            throw InvalidTelegramInitData("Telegram init data hash does not match")
+        }
 
         val authDate = try {
             fields["auth_date"]?.toLongOrNull()?.let(Instant::ofEpochSecond)

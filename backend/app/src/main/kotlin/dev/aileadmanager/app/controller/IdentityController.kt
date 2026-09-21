@@ -11,6 +11,7 @@ import dev.aileadmanager.telegram.TelegramAuthUnavailable
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import jakarta.validation.Valid
+import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.security.core.annotation.AuthenticationPrincipal
@@ -28,6 +29,8 @@ class IdentityController(
     private val authService: TelegramAuthService,
     private val csrfTokens: CsrfTokenRepository,
 ) {
+    private val logger = LoggerFactory.getLogger(IdentityController::class.java)
+
     @GetMapping("/api/auth/csrf")
     fun csrf(csrfToken: CsrfToken): CsrfResponse = CsrfResponse(csrfToken.token, csrfToken.headerName)
 
@@ -39,10 +42,16 @@ class IdentityController(
     ): CurrentUserResponse {
         val user = try {
             authService.authenticate(body.initData)
-        } catch (_: InvalidTelegramInitData) {
-            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid Telegram authentication data")
-        } catch (_: TelegramAuthUnavailable) {
-            throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Telegram authentication is not configured")
+        } catch (exc: InvalidTelegramInitData) {
+            logger.warn(
+                "Telegram authentication failed: ${exc.message}; initDataLength=${body.initData.length}", exc,
+            )
+            throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid Telegram authentication data", exc)
+        } catch (exc: TelegramAuthUnavailable) {
+            logger.error("Telegram authentication is unavailable", exc)
+            throw ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Telegram authentication is not configured",
+                exc,
+            )
         }
         val session = request.getSession(true)
         request.changeSessionId()
