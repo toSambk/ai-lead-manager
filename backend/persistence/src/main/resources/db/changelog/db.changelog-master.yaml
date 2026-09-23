@@ -5,3 +5,6 @@ databaseChangeLog:
   - include:
       file: changes/002-sessions.sql
       relativeToChangelogFile: true
+  - include:
+      file: changes/003-lead-events.sql
+      relativeToChangelogFile: true

@@ -18,3 +18,7 @@ internal interface SpringLeadRepository : CrudRepository<LeadRecord, Long>, Pagi
     fun findByIdAndCustomerId(id: Long, customerId: Long): LeadRecord?
     fun findByCustomerId(customerId: Long, pageable: Pageable): Page<LeadRecord>
 }
+
+internal interface SpringLeadEventRepository : CrudRepository<LeadEventRecord, Long> {
+    fun findByLeadIdOrderByCreatedAtDescIdDesc(leadId: Long): List<LeadEventRecord>
+}

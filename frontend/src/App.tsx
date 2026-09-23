@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { authenticateWithTelegram, type CurrentUser } from './api'
 import { LeadForm } from './LeadForm'
+import { LeadWorkspace } from './LeadWorkspace'
 import './App.css'
 
 type BackendStatus = 'checking' | 'online' | 'offline'
@@ -12,6 +13,7 @@ function App() {
     () => window.Telegram?.WebApp?.initData ? 'checking' : 'outside-telegram',
   )
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null)
+  const [leadListVersion, setLeadListVersion] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -78,12 +80,14 @@ function App() {
         </p>
       </section>
 
-      {authenticationStatus === 'authenticated' && currentUser?.role === 'CUSTOMER' && <LeadForm />}
-      {authenticationStatus === 'authenticated' && currentUser?.role !== 'CUSTOMER' && (
-        <section className="lead-panel">
-          <h2>Welcome, {currentUser?.displayName}</h2>
-          <p>The manager workspace is being prepared.</p>
-        </section>
+      {authenticationStatus === 'authenticated' && currentUser?.role === 'CUSTOMER' && (
+        <div className="workspace-stack">
+          <LeadForm onCreated={() => setLeadListVersion((current) => current + 1)} />
+          <LeadWorkspace role={currentUser.role} refreshKey={leadListVersion} />
+        </div>
+      )}
+      {authenticationStatus === 'authenticated' && currentUser?.role !== 'CUSTOMER' && currentUser && (
+        <LeadWorkspace role={currentUser.role} />
       )}
     </main>
   )

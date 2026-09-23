@@ -6,7 +6,7 @@ This document defines the target requirements, the scope of the first release, a
 
 ## Current implementation
 
-The monorepo skeleton is in place: five Kotlin Gradle modules, a React/TypeScript frontend, and a Compose configuration for the backend and PostgreSQL. The backend connects to PostgreSQL, runs Liquibase migrations for the foundation schema and JDBC sessions, and provides Spring Data JDBC repositories for users, service categories, and leads. Telegram Mini App `initData` verification, session login, `/api/me`, logout, `GET /api/categories`, and `POST /api/leads` are implemented. The frontend signs in automatically inside Telegram and lets a customer submit a lead and see its reference. Lead listing, bot commands, outgoing messages, and AI processing remain planned; their routes return `501 Not Implemented`.
+The monorepo skeleton is in place: five Kotlin Gradle modules, a React/TypeScript frontend, and a Compose configuration for the backend and PostgreSQL. The backend connects to PostgreSQL, runs Liquibase migrations for the foundation schema, JDBC sessions, and lead audit events, and provides Spring Data JDBC repository adapters. Telegram Mini App `initData` verification, session login, `/api/me`, logout, `GET /api/categories`, lead creation, role-scoped lead reads, manager status transitions, and status audit history are implemented. The frontend lets a customer submit and review leads and gives managers and administrators a lead inbox with status controls and activity history. Bot commands, owner assignment, messages, outgoing delivery, and AI processing remain planned; their routes return `501 Not Implemented`.
 
 ~~~text
 ai-lead-manager/
@@ -25,7 +25,7 @@ ai-lead-manager/
 └── README.md
 ~~~
 
-The backend modules produce one Spring Boot service. The core module has no integration dependencies; persistence, telegram, and ai depend on core; app wires them together. The frontend lives in the same repository and is built with npm. See [module architecture](docs/architecture.md) and the [preliminary HTTP API](docs/api.md).
+The backend modules produce one Spring Boot service. The core module has no integration dependencies; persistence, telegram, and ai depend on core; app wires them together. The frontend lives in the same repository and is built with npm. See the [end-to-end happy path](docs/happy-path.md), [module architecture](docs/architecture.md), and [preliminary HTTP API](docs/api.md).
 
 ### Run locally
 
@@ -149,7 +149,7 @@ Planned stack:
 - **Local environment:** Docker Compose for PostgreSQL and later application services.
 - **AI:** An isolated provider interface and a local stub implementation.
 
-The first release uses one backend service with the app, core, persistence, telegram, and ai modules. The first migration creates users, service categories, and leads; Spring Data JDBC provides their storage operations. Lead messages, lead events, Telegram update records, AI results, and AI jobs remain planned. The [data model](docs/data-model.md) defines the schema and persistence module boundary; migrations and API documentation will record implemented contracts as each phase progresses.
+The first release uses one backend service with the app, core, persistence, telegram, and ai modules. Versioned migrations create users, service categories, leads, JDBC sessions, and append-only lead events; Spring Data JDBC provides their storage operations. Status events are implemented. Lead messages, Telegram update records, AI results, and AI jobs remain planned. The [data model](docs/data-model.md) defines the schema and persistence module boundary; migrations and API documentation record implemented contracts as each phase progresses.
 
 ### Access and reliability
 

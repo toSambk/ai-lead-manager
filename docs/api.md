@@ -1,6 +1,6 @@
 # Preliminary HTTP API
 
-This document records the proposed first-release API. The paths and responsibilities are provisional; request and response schemas will be finalized with each use case. `GET /api/system`, Telegram session login, `/api/me`, logout, `GET /api/categories`, and `POST /api/leads` are implemented. The remaining planned routes return `501 Not Implemented`. A registered route is not evidence that Telegram message delivery or AI processing is available.
+This document records the proposed first-release API. The paths and responsibilities are provisional; request and response schemas will be finalized with each use case. `GET /api/system`, Telegram session login, `/api/me`, logout, `GET /api/categories`, lead creation and reads, manager status transitions, and lead event history are implemented. The remaining planned routes return `501 Not Implemented`. A registered route is not evidence that Telegram message delivery or AI processing is available.
 
 All controllers live in `backend/app/src/main/kotlin/dev/aileadmanager/app/controller`. The frontend calls the backend over HTTP. The backend derives user identity and role from verified Telegram data; a request body cannot assign its own customer ID or role. Customer-scoped reads must enforce ownership, and manager and administrator operations require their respective roles before implementation is considered complete.
 
@@ -21,12 +21,12 @@ All controllers live in `backend/app/src/main/kotlin/dev/aileadmanager/app/contr
 | Method | Path | Intended caller | Planned behavior |
 | --- | --- | --- | --- |
 | `POST` | `/api/leads` | Customer | Validate and save a lead; return its ID and public reference. Implemented for an authenticated customer. AI analysis will be queued in a later phase. |
-| `GET` | `/api/leads` | Customer, manager, administrator | Return a paginated list. Customers see only their leads; managers can filter by status, priority, and owner. |
-| `GET` | `/api/leads/{id}` | Customer, manager, administrator | Return the lead detail allowed by the caller's role. |
-| `PATCH` | `/api/leads/{id}/status` | Manager, administrator | Apply a valid status transition and write an audit event. |
+| `GET` | `/api/leads` | Customer, manager, administrator | Return a paginated list ordered newest first. Implemented with `page` and `size`; customers see only their leads, while managers and administrators see all leads. Filters remain planned. |
+| `GET` | `/api/leads/{id}` | Customer, manager, administrator | Return lead detail. Implemented; customers can retrieve only their own leads, while managers and administrators can retrieve any lead. |
+| `PATCH` | `/api/leads/{id}/status` | Manager, administrator | Apply a valid status transition with optimistic version checking and append an audit event in the same transaction. Implemented. |
 | `PATCH` | `/api/leads/{id}/assignee` | Manager, administrator | Assign an eligible owner and write an audit event. |
 | `POST` | `/api/leads/{id}/notes` | Manager, administrator | Add an internal note that is never sent to a customer. |
-| `GET` | `/api/leads/{id}/events` | Manager, administrator | Return the lead's audit history. |
+| `GET` | `/api/leads/{id}/events` | Manager, administrator | Return the lead's newest-first audit history. Implemented for status events. |
 | `GET` | `/api/leads/{id}/messages` | Customer, manager, administrator | Return messages visible to the caller. Internal notes are excluded from customer responses. |
 
 ### Create lead contract
@@ -56,6 +56,25 @@ With a verified customer identity, success returns `201 Created` with `Location:
 ~~~
 
 Invalid input or an unavailable category returns `400 Bad Request`; an absent session returns `401 Unauthorized`, and a session without the `CUSTOMER` role returns `403 Forbidden`. The core use case checks that the customer exists with role `CUSTOMER`, the category is active, and the input satisfies domain rules before saving. The controller obtains the customer ID from the Spring Security principal. No HTTP header or JSON field can substitute for it. AI jobs and Telegram notifications are not created yet.
+
+### Read lead contract
+
+`GET /api/leads?page=0&size=20` accepts a zero-based page and a size from 1 to 100. It returns `items`, `page`, `size`, `totalElements`, and `totalPages`. Items and `GET /api/leads/{id}` include the stable reference, category, submitted fields, status, optional owner, timestamps, and optimistic `version`. A customer query is scoped by the authenticated user's internal ID at the repository boundary. Requesting a missing or another customer's lead returns `404 Not Found`; invalid pagination returns `400 Bad Request`.
+
+### Change status contract
+
+`PATCH /api/leads/{id}/status` accepts the target status and the version last read by the manager:
+
+~~~json
+{
+  "status": "IN_PROGRESS",
+  "version": 0
+}
+~~~
+
+Managers and administrators can use this endpoint. Customers receive `403 Forbidden`. The implemented transitions are `NEW` to `CLARIFICATION`, `IN_PROGRESS`, or `REJECTED`; `CLARIFICATION` to `NEW`, `IN_PROGRESS`, or `REJECTED`; and `IN_PROGRESS` to `COMPLETED` or `REJECTED`. `COMPLETED` and `REJECTED` are terminal. A repeated or invalid transition and a stale version return `409 Conflict`; a missing lead returns `404 Not Found`.
+
+The response is the updated lead with an incremented version. The update and its `STATUS_CHANGED` event are committed atomically. `GET /api/leads/{id}/events` returns those events newest first and is restricted to managers and administrators.
 
 ### Mini App session flow
 

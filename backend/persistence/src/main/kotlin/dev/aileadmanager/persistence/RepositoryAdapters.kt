@@ -1,6 +1,8 @@
 package dev.aileadmanager.persistence
 
 import dev.aileadmanager.core.Lead
+import dev.aileadmanager.core.LeadEvent
+import dev.aileadmanager.core.LeadEventRepository
 import dev.aileadmanager.core.LeadPage
 import dev.aileadmanager.core.LeadRepository
 import dev.aileadmanager.core.ServiceCategory
@@ -117,4 +119,25 @@ internal class JdbcLeadRepository(private val records: SpringLeadRepository) : L
 
     private fun pageRequest(page: Int, size: Int): PageRequest =
         PageRequest.of(page, size, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")))
+}
+
+@Repository
+internal class JdbcLeadEventRepository(private val records: SpringLeadEventRepository) : LeadEventRepository {
+    override fun save(event: LeadEvent): LeadEvent {
+        val createdAt = event.createdAt ?: Instant.now().truncatedTo(ChronoUnit.MICROS)
+        return records.save(LeadEventRecord(
+            id = event.id,
+            leadId = event.leadId,
+            actorId = event.actorId,
+            eventType = event.type,
+            oldStatus = event.oldStatus,
+            newStatus = event.newStatus,
+            oldOwnerId = event.oldOwnerId,
+            newOwnerId = event.newOwnerId,
+            createdAt = createdAt,
+        )).toDomain()
+    }
+
+    override fun findByLeadId(leadId: Long): List<LeadEvent> =
+        records.findByLeadIdOrderByCreatedAtDescIdDesc(leadId).map(LeadEventRecord::toDomain)
 }

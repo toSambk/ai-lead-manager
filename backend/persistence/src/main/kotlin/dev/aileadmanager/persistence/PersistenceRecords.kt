@@ -1,6 +1,8 @@
 package dev.aileadmanager.persistence
 
 import dev.aileadmanager.core.Lead
+import dev.aileadmanager.core.LeadEvent
+import dev.aileadmanager.core.LeadEventType
 import dev.aileadmanager.core.LeadStatus
 import dev.aileadmanager.core.ServiceCategory
 import dev.aileadmanager.core.User
@@ -53,5 +55,30 @@ internal data class LeadRecord(
     fun toDomain() = Lead(
         id, customerId, categoryId, description, estimatedBudgetAmount, budgetCurrency,
         desiredDeadline, contactDetails, status, ownerId, createdAt, updatedAt, version,
+    )
+}
+
+@Table(value = "lead_events", schema = "AI_LEAD_MANAGER")
+internal data class LeadEventRecord(
+    @field:Id val id: Long? = null,
+    val leadId: Long,
+    val actorId: Long?,
+    val eventType: LeadEventType,
+    val oldStatus: LeadStatus?,
+    val newStatus: LeadStatus?,
+    val oldOwnerId: Long?,
+    val newOwnerId: Long?,
+    val createdAt: Instant,
+) {
+    fun toDomain() = LeadEvent(
+        id = id,
+        leadId = leadId,
+        actorId = actorId,
+        type = eventType,
+        oldStatus = oldStatus,
+        newStatus = newStatus,
+        oldOwnerId = oldOwnerId,
+        newOwnerId = newOwnerId,
+        createdAt = createdAt,
     )
 }

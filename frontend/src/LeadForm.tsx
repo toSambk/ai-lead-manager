@@ -21,7 +21,7 @@ const emptyForm: FormValues = {
 
 const budgetPattern = /^(?:0|[1-9]\d{0,11})(?:\.\d{1,2})?$/
 
-export function LeadForm() {
+export function LeadForm({ onCreated }: { onCreated?: () => void }) {
   const [categories, setCategories] = useState<ServiceCategory[]>([])
   const [categoriesLoading, setCategoriesLoading] = useState(true)
   const [categoriesError, setCategoriesError] = useState(false)
@@ -87,6 +87,7 @@ export function LeadForm() {
         contactDetails,
       })
       setCreatedLead(lead)
+      onCreated?.()
     } catch (error) {
       if (error instanceof ApiError && error.status === 400) {
         setFormError('Check the form values and try again.')

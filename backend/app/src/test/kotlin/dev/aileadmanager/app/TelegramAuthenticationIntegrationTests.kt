@@ -76,6 +76,24 @@ class TelegramAuthenticationIntegrationTests {
             assertTrue(leadId > 0)
             assertEquals("NEW", mapper.readTree(created.body()).path("status").stringValue())
 
+            val customerLeadList = send(client, "GET", "/api/leads?page=0&size=20")
+            assertEquals(200, customerLeadList.statusCode(), customerLeadList.body())
+            val leadItems = mapper.readTree(customerLeadList.body()).path("items")
+            assertTrue(leadItems.any { it.path("id").longValue() == leadId })
+            assertEquals("Automation", leadItems.first { it.path("id").longValue() == leadId }.path("category").path("name").stringValue())
+
+            val customerLeadDetail = send(client, "GET", "/api/leads/$leadId")
+            assertEquals(200, customerLeadDetail.statusCode(), customerLeadDetail.body())
+            assertEquals("LM-${leadId.toString().padStart(6, '0')}", mapper.readTree(customerLeadDetail.body()).path("reference").stringValue())
+            val initialVersion = mapper.readTree(customerLeadDetail.body()).path("version").longValue()
+            assertEquals(404, send(client, "GET", "/api/leads/${Long.MAX_VALUE}").statusCode())
+            assertEquals(400, send(client, "GET", "/api/leads?page=-1").statusCode())
+            assertEquals(403, send(client, "GET", "/api/leads/$leadId/events").statusCode())
+            assertEquals(
+                403,
+                send(client, "PATCH", "/api/leads/$leadId/status", """{"status":"IN_PROGRESS","version":$initialVersion}""", csrf).statusCode(),
+            )
+
             jdbc.update(
                 "UPDATE \"AI_LEAD_MANAGER\".users SET role = 'MANAGER' WHERE telegram_user_id = ?",
                 telegramId,
@@ -84,6 +102,35 @@ class TelegramAuthenticationIntegrationTests {
             assertEquals("MANAGER", mapper.readTree(updatedMe.body()).path("role").stringValue())
             val managerAdminProbe = send(client, "GET", "/api/admin/managers")
             assertEquals(403, managerAdminProbe.statusCode(), managerAdminProbe.body())
+
+            val statusChanged = send(
+                client,
+                "PATCH",
+                "/api/leads/$leadId/status",
+                """{"status":"IN_PROGRESS","version":$initialVersion}""",
+                csrf,
+            )
+            assertEquals(200, statusChanged.statusCode(), statusChanged.body())
+            val changedLead = mapper.readTree(statusChanged.body())
+            assertEquals("IN_PROGRESS", changedLead.path("status").stringValue())
+            assertEquals(initialVersion + 1, changedLead.path("version").longValue())
+
+            val events = send(client, "GET", "/api/leads/$leadId/events")
+            assertEquals(200, events.statusCode(), events.body())
+            val firstEvent = mapper.readTree(events.body()).first()
+            assertEquals("STATUS_CHANGED", firstEvent.path("type").stringValue())
+            assertEquals("NEW", firstEvent.path("oldStatus").stringValue())
+            assertEquals("IN_PROGRESS", firstEvent.path("newStatus").stringValue())
+
+            val staleUpdate = send(
+                client,
+                "PATCH",
+                "/api/leads/$leadId/status",
+                """{"status":"REJECTED","version":$initialVersion}""",
+                csrf,
+            )
+            assertEquals(409, staleUpdate.statusCode(), staleUpdate.body())
+
             val forbidden = send(client, "POST", "/api/leads", """
                 {"categoryId":$categoryId,"description":"Another lead","contactDetails":"@owner"}
             """.trimIndent(), csrf)

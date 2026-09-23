@@ -22,6 +22,44 @@ export type CreateLeadResponse = {
   createdAt: string
 }
 
+export type LeadStatus = 'NEW' | 'CLARIFICATION' | 'IN_PROGRESS' | 'COMPLETED' | 'REJECTED'
+
+export type Lead = {
+  id: number
+  reference: string
+  customerId: number
+  category: ServiceCategory
+  description: string
+  estimatedBudgetAmount: number | null
+  budgetCurrency: string | null
+  desiredDeadline: string | null
+  contactDetails: string
+  status: LeadStatus
+  ownerId: number | null
+  createdAt: string
+  updatedAt: string
+  version: number
+}
+
+export type LeadPage = {
+  items: Lead[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+}
+
+export type LeadEvent = {
+  id: number
+  type: 'STATUS_CHANGED' | 'OWNER_CHANGED'
+  actorId: number | null
+  oldStatus: LeadStatus | null
+  newStatus: LeadStatus | null
+  oldOwnerId: number | null
+  newOwnerId: number | null
+  createdAt: string
+}
+
 export class ApiError extends Error {
   readonly status: number
 
@@ -99,4 +137,32 @@ export async function createLead(request: CreateLeadRequest): Promise<CreateLead
   })
   if (!response.ok) throw new ApiError(response.status)
   return response.json() as Promise<CreateLeadResponse>
+}
+
+export async function getLeads(page = 0, size = 20, signal?: AbortSignal): Promise<LeadPage> {
+  const response = await apiFetch(`/api/leads?page=${page}&size=${size}`, { signal })
+  if (!response.ok) throw new ApiError(response.status)
+  return response.json() as Promise<LeadPage>
+}
+
+export async function getLead(id: number, signal?: AbortSignal): Promise<Lead> {
+  const response = await apiFetch(`/api/leads/${id}`, { signal })
+  if (!response.ok) throw new ApiError(response.status)
+  return response.json() as Promise<Lead>
+}
+
+export async function changeLeadStatus(id: number, status: LeadStatus, version: number): Promise<Lead> {
+  const response = await apiFetch(`/api/leads/${id}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status, version }),
+  })
+  if (!response.ok) throw new ApiError(response.status)
+  return response.json() as Promise<Lead>
+}
+
+export async function getLeadEvents(id: number, signal?: AbortSignal): Promise<LeadEvent[]> {
+  const response = await apiFetch(`/api/leads/${id}/events`, { signal })
+  if (!response.ok) throw new ApiError(response.status)
+  return response.json() as Promise<LeadEvent[]>
 }

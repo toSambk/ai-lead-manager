@@ -139,9 +139,97 @@ h1 {
 .success-icon { display: grid; width: 46px; height: 46px; place-items: center; border-radius: 50%; background: #dcf5e7; color: #218758; font-size: 24px; }
 .lead-reference { margin: 6px 0 14px; font-size: 28px; letter-spacing: 0.02em; }
 
+.workspace-stack { display: grid; gap: 24px; }
+.lead-workspace { margin-top: 0; }
+.workspace-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.workspace-heading .secondary-button { flex: none; }
+.empty-state { margin: 0; color: #6b7688; line-height: 1.5; }
+
+.lead-list { display: grid; gap: 10px; }
+.lead-list-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid #e1e6ef;
+  border-radius: 12px;
+  background: #fbfcfe;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.lead-list-item:hover { border-color: #aebee9; background: #f6f8ff; }
+.lead-list-item > span:first-child { display: grid; min-width: 0; gap: 5px; }
+.lead-list-item small { overflow: hidden; color: #6b7688; text-overflow: ellipsis; white-space: nowrap; }
+
+.lead-status {
+  flex: none;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: #edf1f7;
+  color: #4c596c;
+  font-size: 11px;
+  font-weight: 750;
+}
+.lead-status--new { background: #e8eeff; color: #3156d5; }
+.lead-status--clarification { background: #fff2d8; color: #8a5a00; }
+.lead-status--in_progress { background: #e8f4ff; color: #17639a; }
+.lead-status--completed { background: #dcf5e7; color: #218758; }
+.lead-status--rejected { background: #fde8eb; color: #a52233; }
+
+.pagination { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; color: #6b7688; font-size: 13px; }
+.pagination .secondary-button:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.lead-detail {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #e2e7ef;
+}
+.detail-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.detail-heading h3 { margin: 0; font-size: 24px; }
+.detail-close { padding: 0 6px; border: 0; background: none; color: #68758a; font-size: 28px; line-height: 1; cursor: pointer; }
+.lead-detail dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 24px; margin: 24px 0 0; }
+.lead-detail dl > div { min-width: 0; }
+.lead-detail dt { margin-bottom: 5px; color: #7a8494; font-size: 12px; font-weight: 650; text-transform: uppercase; }
+.lead-detail dd { margin: 0; overflow-wrap: anywhere; line-height: 1.5; }
+.lead-detail .detail-wide { grid-column: 1 / -1; }
+
+.status-control, .event-history {
+  margin-top: 26px;
+  padding-top: 24px;
+  border-top: 1px solid #e2e7ef;
+}
+.status-control h4, .event-history h4 { margin: 0 0 14px; font-size: 18px; }
+.status-control-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
+.status-control-row select {
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid #cfd7e4;
+  border-radius: 10px;
+  background: white;
+  color: inherit;
+  font: inherit;
+}
+.status-control-row .primary-button { width: auto; }
+.status-control .form-error { margin-top: 12px; }
+.event-history { display: grid; gap: 10px; }
+.event-item { display: grid; gap: 4px; padding: 12px 14px; border-radius: 10px; background: #f6f8fc; }
+.event-item span { font-size: 14px; font-weight: 650; }
+.event-item small { color: #7a8494; }
+
 @media (max-width: 600px) {
   .page { padding: 20px 18px 40px; }
   .intro { padding: 48px 0 26px; }
   .lead-panel { padding: 24px 18px; }
   .status { max-width: 138px; text-align: left; }
+  .workspace-heading { align-items: stretch; flex-direction: column; }
+  .workspace-heading .secondary-button { align-self: flex-start; }
+  .lead-list-item { align-items: flex-start; flex-direction: column; }
+  .lead-detail dl { grid-template-columns: 1fr; }
+  .lead-detail .detail-wide { grid-column: auto; }
+  .status-control-row { grid-template-columns: 1fr; }
+  .status-control-row .primary-button { width: 100%; }
 }

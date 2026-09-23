@@ -37,6 +37,8 @@ class SecurityConfiguration {
             rules.requestMatchers("/api/telegram/webhook").permitAll()
             rules.requestMatchers("/api/admin/**").hasRole("ADMIN")
             rules.requestMatchers(HttpMethod.POST, "/api/leads").hasRole(CUSTOMER.name)
+            rules.requestMatchers(HttpMethod.PATCH, "/api/leads/*/status").hasAnyRole("MANAGER", "ADMIN")
+            rules.requestMatchers(HttpMethod.GET, "/api/leads/*/events").hasAnyRole("MANAGER", "ADMIN")
             rules.anyRequest().authenticated()
         }
         http.httpBasic { it.disable() }
