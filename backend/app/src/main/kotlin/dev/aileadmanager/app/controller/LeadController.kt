@@ -3,24 +3,36 @@ package dev.aileadmanager.app.controller
 import dev.aileadmanager.app.dto.CreateLeadRequest
 import dev.aileadmanager.app.dto.CreateLeadResponse
 import dev.aileadmanager.app.dto.ChangeLeadStatusRequest
+import dev.aileadmanager.app.dto.AssignLeadOwnerRequest
 import dev.aileadmanager.app.dto.LeadEventResponse
 import dev.aileadmanager.app.dto.LeadPageResponse
 import dev.aileadmanager.app.dto.LeadResponse
+import dev.aileadmanager.app.dto.AddLeadNoteRequest
+import dev.aileadmanager.app.dto.LeadNoteResponse
 import dev.aileadmanager.app.security.CurrentUser
 import dev.aileadmanager.app.service.LeadStatusService
+import dev.aileadmanager.app.service.LeadAssignmentService
 import dev.aileadmanager.core.Lead
 import dev.aileadmanager.core.ServiceCategoryRepository
 import dev.aileadmanager.core.usecase.CreateLeadCommand
 import dev.aileadmanager.core.usecase.CreateLeadException
 import dev.aileadmanager.core.usecase.CreateLeadFailure
-import dev.aileadmanager.core.usecase.CreateLeadUseCase
+import dev.aileadmanager.app.service.LeadCreationService
 import dev.aileadmanager.core.usecase.ChangeLeadStatusCommand
 import dev.aileadmanager.core.usecase.ChangeLeadStatusException
 import dev.aileadmanager.core.usecase.ChangeLeadStatusFailure
+import dev.aileadmanager.core.usecase.AssignLeadOwnerCommand
+import dev.aileadmanager.core.usecase.AssignLeadOwnerException
+import dev.aileadmanager.core.usecase.AssignLeadOwnerFailure
 import dev.aileadmanager.core.usecase.GetLeadUseCase
 import dev.aileadmanager.core.usecase.LeadReader
 import dev.aileadmanager.core.usecase.ListLeadEventsUseCase
 import dev.aileadmanager.core.usecase.ListLeadsUseCase
+import dev.aileadmanager.core.usecase.AddLeadNoteCommand
+import dev.aileadmanager.core.usecase.AddLeadNoteUseCase
+import dev.aileadmanager.core.usecase.LeadNoteException
+import dev.aileadmanager.core.usecase.LeadNoteFailure
+import dev.aileadmanager.core.usecase.ListLeadNotesUseCase
 import jakarta.validation.Valid
 import java.net.URI
 import org.springframework.http.HttpStatus
@@ -39,11 +51,14 @@ import org.springframework.web.server.ResponseStatusException
 @RestController
 @RequestMapping("/api/leads")
 class LeadController(
-    private val createLeadUseCase: CreateLeadUseCase,
+    private val leadCreationService: LeadCreationService,
     private val getLeadUseCase: GetLeadUseCase,
     private val listLeadsUseCase: ListLeadsUseCase,
     private val leadStatusService: LeadStatusService,
+    private val leadAssignmentService: LeadAssignmentService,
     private val listLeadEventsUseCase: ListLeadEventsUseCase,
+    private val addLeadNoteUseCase: AddLeadNoteUseCase,
+    private val listLeadNotesUseCase: ListLeadNotesUseCase,
     private val categories: ServiceCategoryRepository,
 ) {
     @PostMapping
@@ -52,7 +67,7 @@ class LeadController(
         @AuthenticationPrincipal customer: CurrentUser,
     ): ResponseEntity<CreateLeadResponse> {
         val lead = try {
-            createLeadUseCase.create(CreateLeadCommand(
+            leadCreationService.create(CreateLeadCommand(
                 customerId = customer.id,
                 categoryId = request.categoryId,
                 description = request.description,
@@ -129,10 +144,53 @@ class LeadController(
     }
 
     @PatchMapping("/{id}/assignee")
-    fun assignOwner(): ResponseEntity<Void> = plannedEndpoint()
+    fun assignOwner(
+        @PathVariable id: Long,
+        @Valid @RequestBody request: AssignLeadOwnerRequest,
+        @AuthenticationPrincipal user: CurrentUser,
+    ): LeadResponse {
+        val result = try {
+            leadAssignmentService.assign(AssignLeadOwnerCommand(
+                leadId = id,
+                actorId = user.id,
+                actorRole = user.role,
+                ownerId = request.ownerId,
+                expectedVersion = request.version,
+            ))
+        } catch (error: AssignLeadOwnerException) {
+            throw error.toResponseStatusException()
+        }
+        return toResponse(result.lead)
+    }
 
     @PostMapping("/{id}/notes")
-    fun addNote(): ResponseEntity<Void> = plannedEndpoint()
+    fun addNote(
+        @PathVariable id: Long,
+        @Valid @RequestBody request: AddLeadNoteRequest,
+        @AuthenticationPrincipal user: CurrentUser,
+    ): ResponseEntity<LeadNoteResponse> {
+        val note = try {
+            addLeadNoteUseCase.add(AddLeadNoteCommand(
+                leadId = id,
+                authorId = user.id,
+                authorRole = user.role,
+                body = request.body,
+            ))
+        } catch (error: LeadNoteException) {
+            throw error.toResponseStatusException()
+        }
+        return ResponseEntity.status(HttpStatus.CREATED).body(LeadNoteResponse.from(note))
+    }
+
+    @GetMapping("/{id}/notes")
+    fun listNotes(
+        @PathVariable id: Long,
+        @AuthenticationPrincipal user: CurrentUser,
+    ): List<LeadNoteResponse> = try {
+        listLeadNotesUseCase.list(id, user.toLeadReader()).map(LeadNoteResponse::from)
+    } catch (error: LeadNoteException) {
+        throw error.toResponseStatusException()
+    }
 
     @GetMapping("/{id}/events")
     fun listEvents(
@@ -154,6 +212,25 @@ class LeadController(
             ChangeLeadStatusFailure.LEAD_NOT_FOUND -> HttpStatus.NOT_FOUND
             ChangeLeadStatusFailure.FORBIDDEN -> HttpStatus.FORBIDDEN
             ChangeLeadStatusFailure.INVALID_TRANSITION, ChangeLeadStatusFailure.VERSION_CONFLICT -> HttpStatus.CONFLICT
+        }
+        return ResponseStatusException(status, message, this)
+    }
+
+    private fun AssignLeadOwnerException.toResponseStatusException(): ResponseStatusException {
+        val status = when (failure) {
+            AssignLeadOwnerFailure.LEAD_NOT_FOUND -> HttpStatus.NOT_FOUND
+            AssignLeadOwnerFailure.FORBIDDEN -> HttpStatus.FORBIDDEN
+            AssignLeadOwnerFailure.OWNER_UNAVAILABLE -> HttpStatus.BAD_REQUEST
+            AssignLeadOwnerFailure.OWNER_UNCHANGED, AssignLeadOwnerFailure.VERSION_CONFLICT -> HttpStatus.CONFLICT
+        }
+        return ResponseStatusException(status, message, this)
+    }
+
+    private fun LeadNoteException.toResponseStatusException(): ResponseStatusException {
+        val status = when (failure) {
+            LeadNoteFailure.LEAD_NOT_FOUND -> HttpStatus.NOT_FOUND
+            LeadNoteFailure.FORBIDDEN -> HttpStatus.FORBIDDEN
+            LeadNoteFailure.INVALID_BODY -> HttpStatus.BAD_REQUEST
         }
         return ResponseStatusException(status, message, this)
     }

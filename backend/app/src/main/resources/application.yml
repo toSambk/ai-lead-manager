@@ -18,3 +18,12 @@ server:
         http-only: true
         secure: ${SESSION_COOKIE_SECURE:true}
         same-site: lax
+ai:
+  provider: ${AI_PROVIDER:stub}
+  worker:
+    enabled: ${AI_WORKER_ENABLED:true}
+    poll-delay: ${AI_WORKER_POLL_DELAY:1000}
+    recovery-delay: ${AI_WORKER_RECOVERY_DELAY:60000}
+    batch-size: ${AI_WORKER_BATCH_SIZE:2}
+    concurrency: ${AI_WORKER_CONCURRENCY:2}
+    lock-timeout: ${AI_WORKER_LOCK_TIMEOUT:PT2M}

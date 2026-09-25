@@ -3,6 +3,8 @@ package dev.aileadmanager.persistence
 import dev.aileadmanager.core.Lead
 import dev.aileadmanager.core.LeadEvent
 import dev.aileadmanager.core.LeadEventType
+import dev.aileadmanager.core.LeadMessage
+import dev.aileadmanager.core.LeadMessageKind
 import dev.aileadmanager.core.LeadStatus
 import dev.aileadmanager.core.ServiceCategory
 import dev.aileadmanager.core.User
@@ -79,6 +81,25 @@ internal data class LeadEventRecord(
         newStatus = newStatus,
         oldOwnerId = oldOwnerId,
         newOwnerId = newOwnerId,
+        createdAt = createdAt,
+    )
+}
+
+@Table(value = "lead_messages", schema = "AI_LEAD_MANAGER")
+internal data class LeadMessageRecord(
+    @field:Id val id: Long? = null,
+    val leadId: Long,
+    val senderId: Long?,
+    val kind: LeadMessageKind,
+    val body: String,
+    val createdAt: Instant,
+) {
+    fun toDomain() = LeadMessage(
+        id = id,
+        leadId = leadId,
+        senderId = senderId,
+        kind = kind,
+        body = body,
         createdAt = createdAt,
     )
 }

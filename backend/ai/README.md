@@ -1,3 +1,3 @@
 # AI module
 
-This module will contain the lead analysis interface, AI provider implementation, structured response validation, and a local stub.
+This module contains AI provider adapters. `StubAiProvider` performs deterministic local analysis without an API key. Provider contracts and result validation live in `backend/core`; job scheduling, retries, and transaction orchestration live in `backend/app`; PostgreSQL job and result storage lives in `backend/persistence`.

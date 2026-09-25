@@ -1,12 +1,15 @@
 package dev.aileadmanager.core.usecase
 
 import dev.aileadmanager.core.Lead
+import dev.aileadmanager.core.AiJobRepository
 import dev.aileadmanager.core.LeadRepository
 import dev.aileadmanager.core.ServiceCategoryRepository
 import dev.aileadmanager.core.UserRepository
 import dev.aileadmanager.core.UserRole
 import java.math.BigDecimal
 import java.time.LocalDate
+import java.time.Clock
+import java.time.Instant
 import java.util.Currency
 import java.util.Locale
 
@@ -28,6 +31,8 @@ class CreateLeadUseCase(
     private val users: UserRepository,
     private val categories: ServiceCategoryRepository,
     private val leads: LeadRepository,
+    private val aiJobs: AiJobRepository,
+    private val clock: Clock = Clock.systemUTC(),
 ) {
     fun create(command: CreateLeadCommand): Lead {
         val customer = users.findById(command.customerId)
@@ -58,7 +63,7 @@ class CreateLeadUseCase(
             invalid("Budget currency must be an ISO 4217 code")
         }
 
-        return leads.save(Lead(
+        val lead = leads.save(Lead(
             customerId = customer.id ?: throw CreateLeadException(
                 CreateLeadFailure.CUSTOMER_UNAVAILABLE, "Customer identity is unavailable",
             ),
@@ -71,6 +76,11 @@ class CreateLeadUseCase(
             desiredDeadline = command.desiredDeadline,
             contactDetails = contactDetails,
         ))
+        aiJobs.enqueue(
+            leadId = checkNotNull(lead.id) { "Saved lead has no ID" },
+            now = Instant.now(clock),
+        )
+        return lead
     }
 
     private fun isKnownCurrency(code: String): Boolean = try {

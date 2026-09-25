@@ -8,3 +8,9 @@ databaseChangeLog:
   - include:
       file: changes/003-lead-events.sql
       relativeToChangelogFile: true
+  - include:
+      file: changes/004-lead-messages.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/005-ai-analysis.sql
+      relativeToChangelogFile: true

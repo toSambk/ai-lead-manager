@@ -4,6 +4,12 @@ export type CurrentUser = {
   role: 'CUSTOMER' | 'MANAGER' | 'ADMIN'
 }
 
+export type DevUser = {
+  key: string
+  displayName: string
+  role: CurrentUser['role']
+}
+
 export type ServiceCategory = { id: number; code: string; name: string }
 
 export type CreateLeadRequest = {
@@ -58,6 +64,44 @@ export type LeadEvent = {
   oldOwnerId: number | null
   newOwnerId: number | null
   createdAt: string
+}
+
+export type LeadNote = {
+  id: number
+  authorId: number | null
+  body: string
+  createdAt: string
+}
+
+export type AssignableManager = {
+  id: number
+  displayName: string
+  role: 'MANAGER' | 'ADMIN'
+}
+
+export type AiJobStatus = 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED'
+
+export type AiAnalysis = {
+  jobId: number
+  status: AiJobStatus
+  attemptCount: number
+  maxAttempts: number
+  nextAttemptAt: string
+  errorCode: string | null
+  result: {
+    summary: string
+    extractedFacts: {
+      category: string
+      budgetAmount: string | null
+      budgetCurrency: string | null
+      desiredDeadline: string | null
+    }
+    missingFields: Array<'BUDGET' | 'DEADLINE'>
+    suggestedQuestion: string | null
+    priority: 'LOW' | 'MEDIUM' | 'HIGH'
+    priorityReason: string
+    createdAt: string
+  } | null
 }
 
 export class ApiError extends Error {
@@ -123,6 +167,37 @@ export function authenticateWithTelegram(initData: string): Promise<CurrentUser>
   return promise
 }
 
+export async function getCurrentUser(signal?: AbortSignal): Promise<CurrentUser> {
+  const response = await apiFetch('/api/me', { signal })
+  if (!response.ok) throw new ApiError(response.status)
+  return response.json() as Promise<CurrentUser>
+}
+
+export async function getDevUsers(signal?: AbortSignal): Promise<DevUser[]> {
+  const response = await apiFetch('/api/dev/auth/users', { signal })
+  if (!response.ok) throw new ApiError(response.status)
+  return response.json() as Promise<DevUser[]>
+}
+
+export async function authenticateAsDevUser(userKey: string): Promise<CurrentUser> {
+  const response = await apiFetch('/api/dev/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userKey }),
+  })
+  if (!response.ok) throw new ApiError(response.status)
+  const user = (await response.json()) as CurrentUser
+  csrfTokenPromise = null
+  await getCsrfToken()
+  return user
+}
+
+export async function logoutCurrentUser(): Promise<void> {
+  const response = await apiFetch('/api/auth/logout', { method: 'POST' })
+  if (!response.ok) throw new ApiError(response.status)
+  csrfTokenPromise = null
+}
+
 export async function getCategories(signal?: AbortSignal): Promise<ServiceCategory[]> {
   const response = await apiFetch('/api/categories', { signal })
   if (!response.ok) throw new ApiError(response.status)
@@ -161,8 +236,52 @@ export async function changeLeadStatus(id: number, status: LeadStatus, version: 
   return response.json() as Promise<Lead>
 }
 
+export async function getAssignableManagers(signal?: AbortSignal): Promise<AssignableManager[]> {
+  const response = await apiFetch('/api/managers', { signal })
+  if (!response.ok) throw new ApiError(response.status)
+  return response.json() as Promise<AssignableManager[]>
+}
+
+export async function assignLeadOwner(id: number, ownerId: number | null, version: number): Promise<Lead> {
+  const response = await apiFetch(`/api/leads/${id}/assignee`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ownerId, version }),
+  })
+  if (!response.ok) throw new ApiError(response.status)
+  return response.json() as Promise<Lead>
+}
+
 export async function getLeadEvents(id: number, signal?: AbortSignal): Promise<LeadEvent[]> {
   const response = await apiFetch(`/api/leads/${id}/events`, { signal })
   if (!response.ok) throw new ApiError(response.status)
   return response.json() as Promise<LeadEvent[]>
+}
+
+export async function getLeadNotes(id: number, signal?: AbortSignal): Promise<LeadNote[]> {
+  const response = await apiFetch(`/api/leads/${id}/notes`, { signal })
+  if (!response.ok) throw new ApiError(response.status)
+  return response.json() as Promise<LeadNote[]>
+}
+
+export async function addLeadNote(id: number, body: string): Promise<LeadNote> {
+  const response = await apiFetch(`/api/leads/${id}/notes`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ body }),
+  })
+  if (!response.ok) throw new ApiError(response.status)
+  return response.json() as Promise<LeadNote>
+}
+
+export async function getAiAnalysis(id: number, signal?: AbortSignal): Promise<AiAnalysis> {
+  const response = await apiFetch(`/api/leads/${id}/ai-analysis`, { signal })
+  if (!response.ok) throw new ApiError(response.status)
+  return response.json() as Promise<AiAnalysis>
+}
+
+export async function retryAiAnalysis(id: number): Promise<AiAnalysis> {
+  const response = await apiFetch(`/api/leads/${id}/ai-analysis/retry`, { method: 'POST' })
+  if (!response.ok) throw new ApiError(response.status)
+  return response.json() as Promise<AiAnalysis>
 }

@@ -34,11 +34,18 @@ class SecurityConfiguration {
             rules.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
             rules.requestMatchers(HttpMethod.GET, "/api/system", "/actuator/health", "/api/auth/csrf", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
             rules.requestMatchers(HttpMethod.POST, "/api/auth/telegram").permitAll()
+            rules.requestMatchers("/api/dev/auth/**").permitAll()
             rules.requestMatchers("/api/telegram/webhook").permitAll()
             rules.requestMatchers("/api/admin/**").hasRole("ADMIN")
             rules.requestMatchers(HttpMethod.POST, "/api/leads").hasRole(CUSTOMER.name)
             rules.requestMatchers(HttpMethod.PATCH, "/api/leads/*/status").hasAnyRole("MANAGER", "ADMIN")
+            rules.requestMatchers(HttpMethod.PATCH, "/api/leads/*/assignee").hasAnyRole("MANAGER", "ADMIN")
             rules.requestMatchers(HttpMethod.GET, "/api/leads/*/events").hasAnyRole("MANAGER", "ADMIN")
+            rules.requestMatchers(HttpMethod.GET, "/api/leads/*/notes").hasAnyRole("MANAGER", "ADMIN")
+            rules.requestMatchers(HttpMethod.POST, "/api/leads/*/notes").hasAnyRole("MANAGER", "ADMIN")
+            rules.requestMatchers(HttpMethod.GET, "/api/leads/*/ai-analysis").hasAnyRole("MANAGER", "ADMIN")
+            rules.requestMatchers(HttpMethod.POST, "/api/leads/*/ai-analysis/retry").hasAnyRole("MANAGER", "ADMIN")
+            rules.requestMatchers(HttpMethod.GET, "/api/managers").hasAnyRole("MANAGER", "ADMIN")
             rules.anyRequest().authenticated()
         }
         http.httpBasic { it.disable() }

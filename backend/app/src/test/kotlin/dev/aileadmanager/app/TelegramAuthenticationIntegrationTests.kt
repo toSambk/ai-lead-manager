@@ -25,7 +25,11 @@ import tools.jackson.databind.ObjectMapper
 
 @SpringBootTest(
     webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-    properties = ["TELEGRAM_BOT_TOKEN=123456:integration-test", "server.servlet.session.cookie.secure=false"],
+    properties = [
+        "TELEGRAM_BOT_TOKEN=123456:integration-test",
+        "server.servlet.session.cookie.secure=false",
+        "ai.worker.enabled=false",
+    ],
 )
 @Import(PostgresTestConfiguration::class)
 class TelegramAuthenticationIntegrationTests {
@@ -47,10 +51,13 @@ class TelegramAuthenticationIntegrationTests {
         var inactiveCategoryId: Long? = null
         try {
             val initialCsrf = getCsrf(client, expectSessionCookie = true)
+            assertEquals(404, send(client, "GET", "/api/dev/auth/users").statusCode())
             assertEquals(401, send(client, "GET", "/api/categories").statusCode())
             val login = send(client, "POST", "/api/auth/telegram", """{"initData":"${signedData(telegramId)}"}""", initialCsrf)
             assertEquals(200, login.statusCode(), login.body())
-            assertEquals("CUSTOMER", mapper.readTree(login.body()).path("role").stringValue())
+            val authenticatedUser = mapper.readTree(login.body())
+            assertEquals("CUSTOMER", authenticatedUser.path("role").stringValue())
+            val authenticatedUserId = authenticatedUser.path("id").longValue()
 
             val me = send(client, "GET", "/api/me")
             assertEquals(200, me.statusCode(), me.body())
@@ -75,6 +82,14 @@ class TelegramAuthenticationIntegrationTests {
             leadId = mapper.readTree(created.body()).path("id").longValue()
             assertTrue(leadId > 0)
             assertEquals("NEW", mapper.readTree(created.body()).path("status").stringValue())
+            assertEquals(
+                1,
+                jdbc.queryForObject(
+                    "SELECT count(*) FROM \"AI_LEAD_MANAGER\".ai_jobs WHERE lead_id = ? AND status = 'PENDING'",
+                    Int::class.java,
+                    leadId,
+                ),
+            )
 
             val customerLeadList = send(client, "GET", "/api/leads?page=0&size=20")
             assertEquals(200, customerLeadList.statusCode(), customerLeadList.body())
@@ -89,9 +104,20 @@ class TelegramAuthenticationIntegrationTests {
             assertEquals(404, send(client, "GET", "/api/leads/${Long.MAX_VALUE}").statusCode())
             assertEquals(400, send(client, "GET", "/api/leads?page=-1").statusCode())
             assertEquals(403, send(client, "GET", "/api/leads/$leadId/events").statusCode())
+            assertEquals(403, send(client, "GET", "/api/leads/$leadId/notes").statusCode())
+            assertEquals(403, send(client, "GET", "/api/leads/$leadId/ai-analysis").statusCode())
+            assertEquals(
+                403,
+                send(client, "POST", "/api/leads/$leadId/notes", """{"body":"Private note"}""", csrf).statusCode(),
+            )
+            assertEquals(403, send(client, "GET", "/api/managers").statusCode())
             assertEquals(
                 403,
                 send(client, "PATCH", "/api/leads/$leadId/status", """{"status":"IN_PROGRESS","version":$initialVersion}""", csrf).statusCode(),
+            )
+            assertEquals(
+                403,
+                send(client, "PATCH", "/api/leads/$leadId/assignee", """{"ownerId":$authenticatedUserId,"version":$initialVersion}""", csrf).statusCode(),
             )
 
             jdbc.update(
@@ -102,6 +128,43 @@ class TelegramAuthenticationIntegrationTests {
             assertEquals("MANAGER", mapper.readTree(updatedMe.body()).path("role").stringValue())
             val managerAdminProbe = send(client, "GET", "/api/admin/managers")
             assertEquals(403, managerAdminProbe.statusCode(), managerAdminProbe.body())
+            val managers = send(client, "GET", "/api/managers")
+            assertEquals(200, managers.statusCode(), managers.body())
+            assertTrue(mapper.readTree(managers.body()).any { it.path("id").longValue() == authenticatedUserId })
+
+            val pendingAnalysis = send(client, "GET", "/api/leads/$leadId/ai-analysis")
+            assertEquals(200, pendingAnalysis.statusCode(), pendingAnalysis.body())
+            assertEquals("PENDING", mapper.readTree(pendingAnalysis.body()).path("status").stringValue())
+            assertEquals(
+                409,
+                send(client, "POST", "/api/leads/$leadId/ai-analysis/retry", "{}", csrf).statusCode(),
+            )
+            val failedJobId = mapper.readTree(pendingAnalysis.body()).path("jobId").longValue()
+            jdbc.update(
+                "UPDATE \"AI_LEAD_MANAGER\".ai_jobs SET status = 'FAILED' WHERE id = ?",
+                failedJobId,
+            )
+            val retriedAnalysis = send(client, "POST", "/api/leads/$leadId/ai-analysis/retry", "{}", csrf)
+            assertEquals(202, retriedAnalysis.statusCode(), retriedAnalysis.body())
+            assertEquals("PENDING", mapper.readTree(retriedAnalysis.body()).path("status").stringValue())
+            assertTrue(mapper.readTree(retriedAnalysis.body()).path("jobId").longValue() != failedJobId)
+
+            val invalidNote = send(client, "POST", "/api/leads/$leadId/notes", """{"body":"   "}""", csrf)
+            assertEquals(400, invalidNote.statusCode(), invalidNote.body())
+            val createdNote = send(
+                client,
+                "POST",
+                "/api/leads/$leadId/notes",
+                """{"body":"  Confirm the budget before the call.  "}""",
+                csrf,
+            )
+            assertEquals(201, createdNote.statusCode(), createdNote.body())
+            val createdNoteJson = mapper.readTree(createdNote.body())
+            assertEquals("Confirm the budget before the call.", createdNoteJson.path("body").stringValue())
+            assertEquals(authenticatedUserId, createdNoteJson.path("authorId").longValue())
+            val notes = send(client, "GET", "/api/leads/$leadId/notes")
+            assertEquals(200, notes.statusCode(), notes.body())
+            assertEquals(createdNoteJson.path("id").longValue(), mapper.readTree(notes.body()).first().path("id").longValue())
 
             val statusChanged = send(
                 client,
@@ -115,12 +178,28 @@ class TelegramAuthenticationIntegrationTests {
             assertEquals("IN_PROGRESS", changedLead.path("status").stringValue())
             assertEquals(initialVersion + 1, changedLead.path("version").longValue())
 
+            val ownerAssigned = send(
+                client,
+                "PATCH",
+                "/api/leads/$leadId/assignee",
+                """{"ownerId":$authenticatedUserId,"version":${initialVersion + 1}}""",
+                csrf,
+            )
+            assertEquals(200, ownerAssigned.statusCode(), ownerAssigned.body())
+            val assignedLead = mapper.readTree(ownerAssigned.body())
+            assertEquals(authenticatedUserId, assignedLead.path("ownerId").longValue())
+            assertEquals(initialVersion + 2, assignedLead.path("version").longValue())
+
             val events = send(client, "GET", "/api/leads/$leadId/events")
             assertEquals(200, events.statusCode(), events.body())
             val firstEvent = mapper.readTree(events.body()).first()
-            assertEquals("STATUS_CHANGED", firstEvent.path("type").stringValue())
-            assertEquals("NEW", firstEvent.path("oldStatus").stringValue())
-            assertEquals("IN_PROGRESS", firstEvent.path("newStatus").stringValue())
+            assertEquals("OWNER_CHANGED", firstEvent.path("type").stringValue())
+            assertTrue(firstEvent.path("oldOwnerId").isNull)
+            assertEquals(authenticatedUserId, firstEvent.path("newOwnerId").longValue())
+            val statusEvent = mapper.readTree(events.body())[1]
+            assertEquals("STATUS_CHANGED", statusEvent.path("type").stringValue())
+            assertEquals("NEW", statusEvent.path("oldStatus").stringValue())
+            assertEquals("IN_PROGRESS", statusEvent.path("newStatus").stringValue())
 
             val staleUpdate = send(
                 client,

@@ -38,7 +38,17 @@ foreach ($requiredName in @('POSTGRES_PASSWORD', 'TELEGRAM_BOT_TOKEN')) {
     }
 }
 
-foreach ($name in @('POSTGRES_HOST', 'POSTGRES_PORT', 'POSTGRES_DB', 'POSTGRES_USER', 'POSTGRES_PASSWORD', 'TELEGRAM_BOT_TOKEN')) {
+foreach ($name in @(
+    'POSTGRES_HOST',
+    'POSTGRES_PORT',
+    'POSTGRES_DB',
+    'POSTGRES_USER',
+    'POSTGRES_PASSWORD',
+    'TELEGRAM_BOT_TOKEN',
+    'SPRING_PROFILES_ACTIVE',
+    'AI_PROVIDER',
+    'AI_WORKER_ENABLED'
+)) {
     if ($settings.ContainsKey($name) -and -not [string]::IsNullOrWhiteSpace($settings[$name])) {
         [Environment]::SetEnvironmentVariable($name, $settings[$name], 'Process')
     }

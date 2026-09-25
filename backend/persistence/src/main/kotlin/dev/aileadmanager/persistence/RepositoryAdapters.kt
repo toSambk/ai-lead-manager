@@ -4,11 +4,15 @@ import dev.aileadmanager.core.Lead
 import dev.aileadmanager.core.LeadEvent
 import dev.aileadmanager.core.LeadEventRepository
 import dev.aileadmanager.core.LeadPage
+import dev.aileadmanager.core.LeadMessage
+import dev.aileadmanager.core.LeadMessageKind
+import dev.aileadmanager.core.LeadMessageRepository
 import dev.aileadmanager.core.LeadRepository
 import dev.aileadmanager.core.ServiceCategory
 import dev.aileadmanager.core.ServiceCategoryRepository
 import dev.aileadmanager.core.User
 import dev.aileadmanager.core.UserRepository
+import dev.aileadmanager.core.UserRole
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import org.springframework.jdbc.core.JdbcTemplate
@@ -60,6 +64,10 @@ internal class JdbcUserRepository(
 
     override fun findByTelegramUserId(telegramUserId: Long): User? =
         records.findByTelegramUserId(telegramUserId)?.toDomain()
+
+    override fun findAssignableManagers(): List<User> =
+        records.findByRoleInOrderByDisplayNameAscIdAsc(setOf(UserRole.MANAGER, UserRole.ADMIN))
+            .map(UserRecord::toDomain)
 }
 
 @Repository
@@ -140,4 +148,23 @@ internal class JdbcLeadEventRepository(private val records: SpringLeadEventRepos
 
     override fun findByLeadId(leadId: Long): List<LeadEvent> =
         records.findByLeadIdOrderByCreatedAtDescIdDesc(leadId).map(LeadEventRecord::toDomain)
+}
+
+@Repository
+internal class JdbcLeadMessageRepository(private val records: SpringLeadMessageRepository) : LeadMessageRepository {
+    override fun save(message: LeadMessage): LeadMessage {
+        val createdAt = message.createdAt ?: Instant.now().truncatedTo(ChronoUnit.MICROS)
+        return records.save(LeadMessageRecord(
+            id = message.id,
+            leadId = message.leadId,
+            senderId = message.senderId,
+            kind = message.kind,
+            body = message.body,
+            createdAt = createdAt,
+        )).toDomain()
+    }
+
+    override fun findInternalNotesByLeadId(leadId: Long): List<LeadMessage> =
+        records.findByLeadIdAndKindOrderByCreatedAtDescIdDesc(leadId, LeadMessageKind.INTERNAL_NOTE)
+            .map(LeadMessageRecord::toDomain)
 }

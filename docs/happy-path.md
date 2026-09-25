@@ -105,9 +105,9 @@ The AI provider returns structured output containing:
 - a suggested clarification question;
 - a priority and its reason.
 
-The backend validates the structure and allowed values before storing an AI result. Invalid output becomes an explicit job failure and is never treated as trusted application data.
+The backend validates the structure and allowed values before storing an AI result. Invalid output is retried within a fixed limit and is never treated as trusted application data. Jobs are claimed with a lease and `SKIP LOCKED`; expired leases are recovered after a worker interruption. The local stub requires no provider key. When required information is missing and the lead remains `NEW`, successful completion atomically changes it to `CLARIFICATION` and writes a system status event.
 
-This step is planned.
+This step is implemented with the local stub. A remote provider adapter remains planned.
 
 ## 6. Notify the manager
 
@@ -119,7 +119,7 @@ This step is planned.
 
 The manager opens the lead inbox and selects a lead. The detail view will combine the submitted data, message history, audit events, and AI analysis.
 
-The manager can assign an eligible owner through `PATCH /api/leads/{id}/assignee` and change status through `PATCH /api/leads/{id}/status`. Core validates permissions, optimistic version, and allowed status transitions. Each successful status change updates the lead and appends a `lead_events` record in one transaction. Owner assignment will follow the same transaction pattern after it is implemented.
+The manager loads eligible owners through `GET /api/managers`, assigns or clears an owner through `PATCH /api/leads/{id}/assignee`, and changes status through `PATCH /api/leads/{id}/status`. Core validates permissions, owner role, optimistic version, and allowed status transitions. Every successful status or owner change updates the lead and appends a `lead_events` record in one transaction. The current shared-queue policy allows any manager or administrator to assign the lead to any manager or administrator.
 
 The intended lifecycle is:
 
@@ -139,7 +139,7 @@ IN_PROGRESS
   -> REJECTED
 ~~~
 
-Lead list, detail, status transitions, audit events, and manager status controls are implemented. Assignment remains planned.
+Lead list, detail, status transitions, owner assignment, internal notes, audit events, and manager controls are implemented. Internal notes are stored separately from customer-visible messages and are available only to managers and administrators.
 
 ## 8. Request clarification
 
@@ -184,6 +184,11 @@ Telegram authentication
   -> PostgreSQL storage
   -> customer or manager lead list
   -> role-scoped lead detail
+  -> manager or administrator assignment
+  -> private internal notes
+  -> persisted AI job and bounded retries
+  -> validated AI result in the manager workspace
+  -> status and owner audit history
 ~~~
 
-The next increment is owner assignment and its audit event, followed by AI jobs and results that the manager workspace can display with an explicit failure state.
+The next increment is Telegram bot command handling and reliable manager notification, followed by customer clarification replies.

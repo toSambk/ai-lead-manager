@@ -18,4 +18,5 @@ interface UserRepository {
     fun upsertTelegramProfile(telegramUserId: Long, displayName: String): User
     fun findById(id: Long): User?
     fun findByTelegramUserId(telegramUserId: Long): User?
+    fun findAssignableManagers(): List<User>
 }

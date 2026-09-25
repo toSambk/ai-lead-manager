@@ -39,6 +39,7 @@ class PersistenceIntegrationTests {
         assertEquals(promoted.id, refreshed.id)
         assertEquals(UserRole.MANAGER, refreshed.role)
         assertEquals("Updated display name", refreshed.displayName)
+        assertTrue(users.findAssignableManagers().any { it.id == promoted.id })
         val customerId = customer.id!!
 
         val lead = leads.save(Lead(

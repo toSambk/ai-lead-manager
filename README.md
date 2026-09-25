@@ -6,7 +6,7 @@ This document defines the target requirements, the scope of the first release, a
 
 ## Current implementation
 
-The monorepo skeleton is in place: five Kotlin Gradle modules, a React/TypeScript frontend, and a Compose configuration for the backend and PostgreSQL. The backend connects to PostgreSQL, runs Liquibase migrations for the foundation schema, JDBC sessions, and lead audit events, and provides Spring Data JDBC repository adapters. Telegram Mini App `initData` verification, session login, `/api/me`, logout, `GET /api/categories`, lead creation, role-scoped lead reads, manager status transitions, and status audit history are implemented. The frontend lets a customer submit and review leads and gives managers and administrators a lead inbox with status controls and activity history. Bot commands, owner assignment, messages, outgoing delivery, and AI processing remain planned; their routes return `501 Not Implemented`.
+The monorepo skeleton is in place: five Kotlin Gradle modules, a React/TypeScript frontend, and a Compose configuration for the backend and PostgreSQL. The backend connects to PostgreSQL, runs Liquibase migrations for sessions and business data, and provides Spring Data JDBC and JDBC repository adapters. Telegram Mini App authentication, lead creation and reads, manager workflow, internal notes, audit history, and PostgreSQL-backed AI analysis jobs are implemented. The AI worker uses a local deterministic stub, validates structured results, persists retries, and exposes analysis state in the manager UI. Bot commands, customer conversations, outgoing delivery, and a remote AI provider remain planned; their routes return `501 Not Implemented`.
 
 ~~~text
 ai-lead-manager/
@@ -29,11 +29,12 @@ The backend modules produce one Spring Boot service. The core module has no inte
 
 ### Run locally
 
-Install Docker Desktop and a Node.js LTS release. Copy `.env.example` to `.env` and set `POSTGRES_PASSWORD`. Set `TELEGRAM_BOT_TOKEN` to authenticate inside Telegram; without it, the auth endpoint returns `503 Service Unavailable`. `.env` is ignored by Git. Set `SESSION_COOKIE_SECURE=true` in `.env` when accessing the Mini App through an HTTPS tunnel; keep it `false` only for plain local HTTP.
+Install Docker Desktop and a Node.js LTS release. Copy `.env.example` to `.env` and set `POSTGRES_PASSWORD`. Set `TELEGRAM_BOT_TOKEN` to authenticate inside Telegram; without it, the auth endpoint returns `503 Service Unavailable`. `.env` is ignored by Git. Set `SESSION_COOKIE_SECURE=true` in `.env` when accessing the Mini App through an HTTPS tunnel; keep it `false` only for plain local HTTP. `AI_PROVIDER=stub` runs deterministic local analysis without an external API key, and `AI_WORKER_ENABLED=true` processes queued jobs inside the backend container. `SPRING_PROFILES_ACTIVE=local` enables the local test-user selector described below. Never enable that profile in production.
 
 From the repository root, build and start PostgreSQL and the backend together:
 
 ~~~powershell
+docker compose --env-file .env -p ai-lead-manager -f infra/compose.yaml down
 docker compose --env-file .env -p ai-lead-manager -f infra/compose.yaml up -d --build
 ~~~
 
@@ -63,7 +64,9 @@ Pass only the hostname, without `https://` or a path. The `-ExecutionPolicy Bypa
 
 To run the backend directly instead, install JDK 21, start PostgreSQL locally or with `docker compose --env-file .env -p ai-lead-manager -f infra/compose.yaml up -d postgres`, and run `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-backend.ps1`. A system Gradle installation is unnecessary. Stop the Compose backend before starting the direct backend to free port 8080.
 
-Open the URL printed by Vite, usually http://localhost:5173. The frontend reports backend connectivity. Outside Telegram, it explains that Mini App sign-in is unavailable; the lead form appears only after Telegram sign-in with the `CUSTOMER` role. The sample API is at http://localhost:8080/api/system; Spring Boot health is at http://localhost:8080/actuator/health. A Telegram Mini App requires a public HTTPS URL for device testing.
+Open the URL printed by Vite, usually http://localhost:5173. The frontend reports backend connectivity. With the `local` Spring profile, it offers Alice and Bob as customers, Mike and Kate as managers, and Alex as an administrator. Switching users replaces the current JDBC-backed session, so the same UI can exercise role and ownership rules without real Telegram accounts. Open a private browser window to keep a second test session active at the same time. Without the `local` profile and outside Telegram, the frontend explains that Mini App sign-in is unavailable. The sample API is at http://localhost:8080/api/system; Spring Boot health is at http://localhost:8080/actuator/health. A Telegram Mini App requires a public HTTPS URL for device testing.
+
+The local authentication routes are registered only when `SPRING_PROFILES_ACTIVE=local`. If an existing `.env` predates this feature, add that line and recreate the backend container. Remove the profile or leave `SPRING_PROFILES_ACTIVE` empty in every deployed environment. Telegram authentication remains available while the local profile is active, allowing both flows to be checked against the same local backend.
 
 The app reads secrets from its process environment. On startup, Liquibase creates the quoted PostgreSQL schema `"AI_LEAD_MANAGER"`, three foundation tables, indexes, constraints, two sample service categories, and Spring Session tables in `public`. Liquibase's `DATABASECHANGELOG` tables also live in `public`.
 
@@ -149,7 +152,7 @@ Planned stack:
 - **Local environment:** Docker Compose for PostgreSQL and later application services.
 - **AI:** An isolated provider interface and a local stub implementation.
 
-The first release uses one backend service with the app, core, persistence, telegram, and ai modules. Versioned migrations create users, service categories, leads, JDBC sessions, and append-only lead events; Spring Data JDBC provides their storage operations. Status events are implemented. Lead messages, Telegram update records, AI results, and AI jobs remain planned. The [data model](docs/data-model.md) defines the schema and persistence module boundary; migrations and API documentation record implemented contracts as each phase progresses.
+The first release uses one backend service with the app, core, persistence, telegram, and ai modules. Versioned migrations create users, service categories, leads, JDBC sessions, append-only lead events, lead messages, AI jobs, and validated AI results. Customer messages and Telegram update records remain planned. The [data model](docs/data-model.md) defines the schema and persistence module boundary; migrations and API documentation record implemented contracts as each phase progresses.
 
 ### Access and reliability
 

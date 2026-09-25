@@ -1,3 +1,5 @@
+name: ai-lead-manager
+
 services:
   backend:
     build:
@@ -11,6 +13,9 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:?Set TELEGRAM_BOT_TOKEN in .env}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      AI_PROVIDER: ${AI_PROVIDER:-stub}
+      AI_WORKER_ENABLED: ${AI_WORKER_ENABLED:-true}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-}
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
