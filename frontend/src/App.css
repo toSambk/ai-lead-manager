@@ -224,12 +224,19 @@ h1 {
 .lead-detail dd { margin: 0; overflow-wrap: anywhere; line-height: 1.5; }
 .lead-detail .detail-wide { grid-column: 1 / -1; }
 
-.status-control, .assignment-control, .ai-analysis, .note-control, .event-history {
+.status-control, .assignment-control, .ai-analysis, .clarification-control, .conversation-history, .note-control, .event-history {
   margin-top: 26px;
   padding-top: 24px;
   border-top: 1px solid #e2e7ef;
 }
-.status-control h4, .assignment-control h4, .ai-analysis h4, .note-control h4, .event-history h4 { margin: 0 0 14px; font-size: 18px; }
+.status-control h4, .assignment-control h4, .ai-analysis h4, .clarification-control h4, .conversation-history h4, .note-control h4, .event-history h4 { margin: 0 0 14px; font-size: 18px; }
+
+.clarification-control textarea { width: 100%; resize: vertical; }
+.conversation-history { display: grid; gap: 12px; }
+.conversation-item { padding: 14px; border-radius: 14px; background: #f7f9fc; }
+.conversation-item p { margin: 6px 0; white-space: pre-wrap; }
+.conversation-item small { color: #667085; }
+.conversation-item--customer_reply { border-left: 3px solid #3156d5; }
 .status-control-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
 .status-control-row select {
   min-height: 46px;

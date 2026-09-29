@@ -27,3 +27,16 @@ ai:
     batch-size: ${AI_WORKER_BATCH_SIZE:2}
     concurrency: ${AI_WORKER_CONCURRENCY:2}
     lock-timeout: ${AI_WORKER_LOCK_TIMEOUT:PT2M}
+telegram:
+  webhook-secret: ${TELEGRAM_WEBHOOK_SECRET:}
+  mini-app-url: ${TELEGRAM_MINI_APP_URL:}
+  manager-chat-id: ${TELEGRAM_MANAGER_CHAT_ID:}
+  api-base-url: ${TELEGRAM_API_BASE_URL:https://api.telegram.org}
+  delivery:
+    worker:
+      enabled: ${TELEGRAM_DELIVERY_WORKER_ENABLED:true}
+      poll-delay: ${TELEGRAM_DELIVERY_POLL_DELAY:1000}
+      recovery-delay: ${TELEGRAM_DELIVERY_RECOVERY_DELAY:60000}
+      batch-size: ${TELEGRAM_DELIVERY_BATCH_SIZE:5}
+      concurrency: ${TELEGRAM_DELIVERY_CONCURRENCY:2}
+      lock-timeout: ${TELEGRAM_DELIVERY_LOCK_TIMEOUT:PT2M}

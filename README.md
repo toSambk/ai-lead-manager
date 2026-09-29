@@ -6,7 +6,7 @@ This document defines the target requirements, the scope of the first release, a
 
 ## Current implementation
 
-The monorepo skeleton is in place: five Kotlin Gradle modules, a React/TypeScript frontend, and a Compose configuration for the backend and PostgreSQL. The backend connects to PostgreSQL, runs Liquibase migrations for sessions and business data, and provides Spring Data JDBC and JDBC repository adapters. Telegram Mini App authentication, lead creation and reads, manager workflow, internal notes, audit history, and PostgreSQL-backed AI analysis jobs are implemented. The AI worker uses a local deterministic stub, validates structured results, persists retries, and exposes analysis state in the manager UI. Bot commands, customer conversations, outgoing delivery, and a remote AI provider remain planned; their routes return `501 Not Implemented`.
+The monorepo skeleton is in place: five Kotlin Gradle modules, a React/TypeScript frontend, and a Compose configuration for the backend and PostgreSQL. The backend connects to PostgreSQL, runs Liquibase migrations for sessions and business data, and provides Spring Data JDBC and JDBC repository adapters. Telegram Mini App authentication, lead creation and reads, manager workflow, internal notes, audit history, PostgreSQL-backed AI analysis jobs, webhook deduplication, `/start` and `/help`, persisted Telegram delivery, and the manager-approved clarification conversation are implemented. The AI worker uses a local deterministic stub, validates structured results, persists retries, and reanalyzes a lead after a customer reply. A remote AI provider remains planned.
 
 ~~~text
 ai-lead-manager/
@@ -14,8 +14,8 @@ ai-lead-manager/
 │   ├── app/          # Spring Boot entry point, REST API, module wiring
 │   ├── core/         # Lead model and business rules
 │   ├── persistence/  # Liquibase migration and Spring Data JDBC repositories
-│   ├── telegram/     # Mini App identity verification; bot integration planned
-│   └── ai/           # Lead analysis (planned)
+│   ├── telegram/     # Mini App identity, webhook parsing, and Bot API transport
+│   └── ai/           # Lead analysis provider adapters
 ├── frontend/         # React + TypeScript, separate npm project
 ├── infra/            # Docker Compose
 ├── docs/             # Architecture notes
@@ -29,7 +29,7 @@ The backend modules produce one Spring Boot service. The core module has no inte
 
 ### Run locally
 
-Install Docker Desktop and a Node.js LTS release. Copy `.env.example` to `.env` and set `POSTGRES_PASSWORD`. Set `TELEGRAM_BOT_TOKEN` to authenticate inside Telegram; without it, the auth endpoint returns `503 Service Unavailable`. `.env` is ignored by Git. Set `SESSION_COOKIE_SECURE=true` in `.env` when accessing the Mini App through an HTTPS tunnel; keep it `false` only for plain local HTTP. `AI_PROVIDER=stub` runs deterministic local analysis without an external API key, and `AI_WORKER_ENABLED=true` processes queued jobs inside the backend container. `SPRING_PROFILES_ACTIVE=local` enables the local test-user selector described below. Never enable that profile in production.
+Install Docker Desktop and a Node.js LTS release. Copy `.env.example` to `.env` and set `POSTGRES_PASSWORD`. Set `TELEGRAM_BOT_TOKEN` to authenticate inside Telegram and call the Bot API; without it, the auth endpoint returns `503 Service Unavailable` and Telegram deliveries fail. Generate a private `TELEGRAM_WEBHOOK_SECRET`, set `TELEGRAM_MINI_APP_URL` to the public HTTPS Mini App URL, and optionally set `TELEGRAM_MANAGER_CHAT_ID` to receive new-lead notifications. `.env` is ignored by Git. Set `SESSION_COOKIE_SECURE=true` in `.env` when accessing the Mini App through an HTTPS tunnel; keep it `false` only for plain local HTTP. `AI_PROVIDER=stub` runs deterministic local analysis without an external API key, and the AI and Telegram worker flags process queued jobs inside the backend container. `SPRING_PROFILES_ACTIVE=local` enables the local test-user selector described below. Never enable that profile in production.
 
 From the repository root, build and start PostgreSQL and the backend together:
 
@@ -61,6 +61,18 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-frontend
 ~~~
 
 Pass only the hostname, without `https://` or a path. The `-ExecutionPolicy Bypass` flag applies only to the launched PowerShell process; it does not change the system policy.
+
+Set the same public URL in `.env` as `TELEGRAM_MINI_APP_URL`, recreate the backend container, and configure the bot menu and webhook. The webhook URL points to the backend through the Vite proxy, so it uses the same public origin:
+
+~~~powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\configure-telegram-bot.ps1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\set-telegram-webhook.ps1 -PublicUrl https://example.trycloudflare.com
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\get-telegram-webhook.ps1
+~~~
+
+Run `remove-telegram-webhook.ps1` when the temporary tunnel is no longer active. Telegram sends `/start` and `/help` updates to `POST /api/telegram/webhook`; the endpoint accepts only the secret configured in `.env`. Sending either command in a private chat also binds that chat to the authenticated Telegram user, which enables lead confirmation delivery after the user submits the Mini App form.
+
+To test clarification end to end, send `/start`, submit a lead without a budget or deadline, and wait for its AI state to become `SUCCEEDED`. The lead moves to `CLARIFICATION`. Open the manager workspace with a manager identity, open that lead, edit the suggested question, save the draft, and select `Approve and send`. Reply to the delivered bot message with a value such as `1500 USD, deadline 2026-12-01`. Reopen the lead after the new AI job completes to see the stored conversation and updated analysis.
 
 To run the backend directly instead, install JDK 21, start PostgreSQL locally or with `docker compose --env-file .env -p ai-lead-manager -f infra/compose.yaml up -d postgres`, and run `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\start-backend.ps1`. A system Gradle installation is unnecessary. Stop the Compose backend before starting the direct backend to free port 8080.
 
@@ -152,7 +164,7 @@ Planned stack:
 - **Local environment:** Docker Compose for PostgreSQL and later application services.
 - **AI:** An isolated provider interface and a local stub implementation.
 
-The first release uses one backend service with the app, core, persistence, telegram, and ai modules. Versioned migrations create users, service categories, leads, JDBC sessions, append-only lead events, lead messages, AI jobs, and validated AI results. Customer messages and Telegram update records remain planned. The [data model](docs/data-model.md) defines the schema and persistence module boundary; migrations and API documentation record implemented contracts as each phase progresses.
+The first release uses one backend service with the app, core, persistence, telegram, and ai modules. Versioned migrations create users, service categories, leads, JDBC sessions, append-only lead events, lead messages, AI jobs, validated AI results, Telegram update records, private chat bindings, delivery jobs, reply drafts, and active clarification conversations. The [data model](docs/data-model.md) defines the schema and persistence module boundary; migrations and API documentation record implemented contracts as each phase progresses.
 
 ### Access and reliability
 

@@ -7,7 +7,12 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
-class LeadCreationService(private val useCase: CreateLeadUseCase) {
+class LeadCreationService(
+    private val useCase: CreateLeadUseCase,
+    private val telegramNotifications: TelegramNotificationService,
+) {
     @Transactional
-    fun create(command: CreateLeadCommand): Lead = useCase.create(command)
+    fun create(command: CreateLeadCommand): Lead = useCase.create(command).also {
+        telegramNotifications.enqueueLeadCreated(it)
+    }
 }

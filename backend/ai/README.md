@@ -1,3 +1,3 @@
 # AI module
 
-This module contains AI provider adapters. `StubAiProvider` performs deterministic local analysis without an API key. Provider contracts and result validation live in `backend/core`; job scheduling, retries, and transaction orchestration live in `backend/app`; PostgreSQL job and result storage lives in `backend/persistence`.
+This module contains AI provider adapters. `StubAiProvider` performs deterministic local analysis without an API key. It includes stored clarification messages in repeat analysis and recognizes an ISO date plus an amount followed by `USD`, `EUR`, or `RUB` in customer replies. Provider contracts and result validation live in `backend/core`; job scheduling, retries, and transaction orchestration live in `backend/app`; PostgreSQL job and result storage lives in `backend/persistence`.

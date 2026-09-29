@@ -45,6 +45,10 @@ class SecurityConfiguration {
             rules.requestMatchers(HttpMethod.POST, "/api/leads/*/notes").hasAnyRole("MANAGER", "ADMIN")
             rules.requestMatchers(HttpMethod.GET, "/api/leads/*/ai-analysis").hasAnyRole("MANAGER", "ADMIN")
             rules.requestMatchers(HttpMethod.POST, "/api/leads/*/ai-analysis/retry").hasAnyRole("MANAGER", "ADMIN")
+            rules.requestMatchers(HttpMethod.GET, "/api/leads/*/reply-drafts").hasAnyRole("MANAGER", "ADMIN")
+            rules.requestMatchers(HttpMethod.POST, "/api/leads/*/reply-drafts").hasAnyRole("MANAGER", "ADMIN")
+            rules.requestMatchers(HttpMethod.PATCH, "/api/leads/*/reply-drafts/*").hasAnyRole("MANAGER", "ADMIN")
+            rules.requestMatchers(HttpMethod.POST, "/api/leads/*/reply-drafts/*/send").hasAnyRole("MANAGER", "ADMIN")
             rules.requestMatchers(HttpMethod.GET, "/api/managers").hasAnyRole("MANAGER", "ADMIN")
             rules.anyRequest().authenticated()
         }

@@ -104,6 +104,30 @@ export type AiAnalysis = {
   } | null
 }
 
+export type ReplyDraftStatus = 'DRAFT' | 'APPROVED' | 'SENT' | 'FAILED'
+
+export type ReplyDraft = {
+  id: number
+  leadId: number
+  authorId: number
+  body: string
+  status: ReplyDraftStatus
+  version: number
+  createdAt: string
+  updatedAt: string
+  approvedAt: string | null
+  sentAt: string | null
+}
+
+export type LeadMessage = {
+  id: number
+  senderId: number | null
+  kind: 'CUSTOMER_REPLY' | 'MANAGER_REPLY' | 'FOLLOW_UP_QUESTION'
+  body: string
+  deliveryStatus: 'PENDING' | 'SENT' | 'FAILED' | null
+  createdAt: string
+}
+
 export class ApiError extends Error {
   readonly status: number
 
@@ -284,4 +308,51 @@ export async function retryAiAnalysis(id: number): Promise<AiAnalysis> {
   const response = await apiFetch(`/api/leads/${id}/ai-analysis/retry`, { method: 'POST' })
   if (!response.ok) throw new ApiError(response.status)
   return response.json() as Promise<AiAnalysis>
+}
+
+export async function getLeadMessages(id: number, signal?: AbortSignal): Promise<LeadMessage[]> {
+  const response = await apiFetch(`/api/leads/${id}/messages`, { signal })
+  if (!response.ok) throw new ApiError(response.status)
+  return response.json() as Promise<LeadMessage[]>
+}
+
+export async function getReplyDrafts(id: number, signal?: AbortSignal): Promise<ReplyDraft[]> {
+  const response = await apiFetch(`/api/leads/${id}/reply-drafts`, { signal })
+  if (!response.ok) throw new ApiError(response.status)
+  return response.json() as Promise<ReplyDraft[]>
+}
+
+export async function createReplyDraft(id: number, body: string): Promise<ReplyDraft> {
+  const response = await apiFetch(`/api/leads/${id}/reply-drafts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ body }),
+  })
+  if (!response.ok) throw new ApiError(response.status)
+  return response.json() as Promise<ReplyDraft>
+}
+
+export async function updateReplyDraft(
+  leadId: number,
+  draftId: number,
+  body: string,
+  version: number,
+): Promise<ReplyDraft> {
+  const response = await apiFetch(`/api/leads/${leadId}/reply-drafts/${draftId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ body, version }),
+  })
+  if (!response.ok) throw new ApiError(response.status)
+  return response.json() as Promise<ReplyDraft>
+}
+
+export async function sendReplyDraft(leadId: number, draftId: number, version: number): Promise<ReplyDraft> {
+  const response = await apiFetch(`/api/leads/${leadId}/reply-drafts/${draftId}/send`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ version }),
+  })
+  if (!response.ok) throw new ApiError(response.status)
+  return response.json() as Promise<ReplyDraft>
 }

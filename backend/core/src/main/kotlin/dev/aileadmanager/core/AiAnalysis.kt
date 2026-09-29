@@ -68,6 +68,7 @@ data class AiAnalysisResult(
 data class AiAnalysisInput(
     val lead: Lead,
     val category: ServiceCategory,
+    val conversation: List<LeadMessage> = emptyList(),
 )
 
 interface AiProvider {

@@ -34,7 +34,7 @@ Telegram delivers the approved reply
 
 The customer sends `/start` to the bot. The bot responds with a button that opens the public HTTPS URL of the Mini App.
 
-The Mini App can currently be opened through a button configured in BotFather. Server-side `/start` handling and bot-generated buttons are planned.
+The Mini App can be opened through the persistent menu button configured with BotFather or `scripts/configure-telegram-bot.ps1`. Server-side `/start` and `/help` handling is implemented through the webhook. The `/start` reply contains a Mini App button when `TELEGRAM_MINI_APP_URL` is configured. A private command also binds the Telegram chat to the local user while preserving an existing manager or administrator role.
 
 ## 2. Authenticate with Telegram
 
@@ -68,10 +68,13 @@ The request follows this path:
 
 ~~~text
 LeadController
-  -> CreateLeadUseCase
-  -> UserRepository and ServiceCategoryRepository validation
-  -> LeadRepository
-  -> PostgreSQL
+  -> LeadCreationService
+     -> CreateLeadUseCase
+        -> UserRepository and ServiceCategoryRepository validation
+        -> LeadRepository
+     -> AI job enqueue
+     -> Telegram notification enqueue
+  -> PostgreSQL transaction commit
 ~~~
 
 Core verifies that the caller is a customer, the category is active, required fields are present, and budget fields are consistent. PostgreSQL stores the lead with status `NEW` and no owner. The API returns `201 Created` with a stable reference such as `LM-000123`.
@@ -113,7 +116,7 @@ This step is implemented with the local stub. A remote provider adapter remains 
 
 Lead creation queues a `SendTelegramMessage` job for the configured manager or team chat. The notification contains the public reference, category, and current status. A Telegram delivery failure does not roll back lead creation.
 
-This step is planned.
+This step is implemented. The configured manager chat receives a queued notification. Delivery is asynchronous and moves through persisted `PENDING`, `RUNNING`, `SUCCEEDED`, and `FAILED` states with bounded retries and stale-lease recovery.
 
 ## 7. Process the lead
 
@@ -145,21 +148,21 @@ Lead list, detail, status transitions, owner assignment, internal notes, audit e
 
 AI may suggest a clarification question, but it cannot send customer-facing text. A manager reviews or edits the suggestion, creates a reply draft, and explicitly approves it through `POST /api/leads/{id}/reply-drafts/{draftId}/send`.
 
-Approval creates a Telegram delivery job. Retrying delivery cannot bypass approval or create duplicate customer messages.
+Approval atomically creates a pending `FOLLOW_UP_QUESTION`, reserves the customer's active conversation, and creates a Telegram delivery job. A successful delivery marks the draft and message sent and changes the conversation to `AWAITING_REPLY`. A terminal delivery failure marks the draft and message failed and cancels the conversation reservation. A unique draft delivery key prevents repeated approval from enqueueing another job. An ambiguous Bot API timeout may still duplicate a Telegram message.
 
-This step is planned.
+This step is implemented in the manager workspace. The customer must first bind a private chat by sending `/start` or `/help`.
 
 ## 9. Receive a customer reply
 
-Telegram sends updates to `POST /api/telegram/webhook`. The backend verifies the webhook secret, claims the Telegram `update_id`, ignores duplicates, associates the reply with the correct lead, and stores it as a lead message. A material reply may create another AI analysis job.
+Telegram sends updates to `POST /api/telegram/webhook`. The backend verifies the webhook secret, claims the Telegram `update_id`, and ignores duplicates. An ordinary private text message is associated with the customer's single `AWAITING_REPLY` conversation, stored as `CUSTOMER_REPLY`, and closes that conversation. The same transaction enqueues another AI analysis job. Text with no active conversation is acknowledged without being attached to a lead.
 
-This step is planned.
+This step is implemented. The local AI stub recognizes an ISO date and a budget written as an amount followed by `USD`, `EUR`, or `RUB` in the customer reply, then produces a new validated result.
 
 ## 10. Complete the lead
 
-The manager changes the lead from `IN_PROGRESS` to `COMPLETED`. The backend updates the lead, appends an audit event, and may queue a completion notification. The customer sees the completed status in `My requests`, while the full history remains available to managers.
+The manager changes the lead from `IN_PROGRESS` to `COMPLETED`. The backend updates the lead and appends an audit event. The customer sees the completed status in `My requests`, while the full history remains available to managers.
 
-This step is planned.
+Status completion and customer visibility are implemented. A separate Telegram completion notification remains planned.
 
 ## Module responsibilities
 
@@ -189,6 +192,14 @@ Telegram authentication
   -> persisted AI job and bounded retries
   -> validated AI result in the manager workspace
   -> status and owner audit history
+  -> idempotent Telegram webhook intake
+  -> /start and /help responses
+  -> private chat binding
+  -> persisted manager notification and customer confirmation delivery
+  -> manager-edited clarification draft and explicit approval
+  -> persisted clarification question delivery
+  -> customer reply associated with the active lead
+  -> repeat AI analysis with conversation history
 ~~~
 
-The next increment is Telegram bot command handling and reliable manager notification, followed by customer clarification replies.
+The next reliability increment is a manager action for retrying a terminal Telegram delivery and automatic UI refresh of delivery and repeat-analysis state. External AI integration remains intentionally deferred.

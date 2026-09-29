@@ -19,6 +19,12 @@ import dev.aileadmanager.core.usecase.ListLeadNotesUseCase
 import dev.aileadmanager.core.usecase.AiAnalysisValidator
 import dev.aileadmanager.core.usecase.GetLeadAiAnalysisUseCase
 import dev.aileadmanager.core.usecase.RetryLeadAiAnalysisUseCase
+import dev.aileadmanager.core.ReplyDraftRepository
+import dev.aileadmanager.core.usecase.ApproveReplyDraftUseCase
+import dev.aileadmanager.core.usecase.CreateReplyDraftUseCase
+import dev.aileadmanager.core.usecase.ListLeadMessagesUseCase
+import dev.aileadmanager.core.usecase.ListReplyDraftsUseCase
+import dev.aileadmanager.core.usecase.UpdateReplyDraftUseCase
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
@@ -87,4 +93,24 @@ class UseCaseConfiguration {
         leads: LeadRepository,
         jobs: AiJobRepository,
     ) = RetryLeadAiAnalysisUseCase(leads, jobs)
+
+    @Bean
+    fun createReplyDraftUseCase(leads: LeadRepository, drafts: ReplyDraftRepository) =
+        CreateReplyDraftUseCase(leads, drafts)
+
+    @Bean
+    fun updateReplyDraftUseCase(leads: LeadRepository, drafts: ReplyDraftRepository) =
+        UpdateReplyDraftUseCase(leads, drafts)
+
+    @Bean
+    fun approveReplyDraftUseCase(leads: LeadRepository, drafts: ReplyDraftRepository) =
+        ApproveReplyDraftUseCase(leads, drafts)
+
+    @Bean
+    fun listReplyDraftsUseCase(leads: LeadRepository, drafts: ReplyDraftRepository) =
+        ListReplyDraftsUseCase(leads, drafts)
+
+    @Bean
+    fun listLeadMessagesUseCase(leads: LeadRepository, messages: LeadMessageRepository) =
+        ListLeadMessagesUseCase(leads, messages)
 }

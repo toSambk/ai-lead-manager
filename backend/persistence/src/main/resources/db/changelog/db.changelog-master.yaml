@@ -14,3 +14,9 @@ databaseChangeLog:
   - include:
       file: changes/005-ai-analysis.sql
       relativeToChangelogFile: true
+  - include:
+      file: changes/006-telegram-delivery.sql
+      relativeToChangelogFile: true
+  - include:
+      file: changes/007-lead-clarification.sql
+      relativeToChangelogFile: true

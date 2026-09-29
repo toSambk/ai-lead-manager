@@ -88,5 +88,8 @@ class LeadNoteUseCasesTests {
 
         override fun save(message: LeadMessage) = message.copy(id = 30).also { saved = it }
         override fun findInternalNotesByLeadId(leadId: Long) = listOfNotNull(saved).filter { it.leadId == leadId }
+        override fun findConversationByLeadId(leadId: Long) = emptyList<LeadMessage>()
+        override fun markDeliverySucceeded(messageId: Long, telegramChatId: Long, telegramMessageId: Long) = Unit
+        override fun markDeliveryFailed(messageId: Long) = Unit
     }
 }

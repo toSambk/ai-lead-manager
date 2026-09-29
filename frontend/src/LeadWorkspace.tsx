@@ -4,19 +4,26 @@ import {
   addLeadNote,
   assignLeadOwner,
   changeLeadStatus,
+  createReplyDraft,
   getAssignableManagers,
   getAiAnalysis,
   getLead,
   getLeadEvents,
   getLeadNotes,
+  getLeadMessages,
   getLeads,
+  getReplyDrafts,
   retryAiAnalysis,
+  sendReplyDraft,
+  updateReplyDraft,
   type CurrentUser,
   type AssignableManager,
   type AiAnalysis,
   type Lead,
   type LeadEvent,
   type LeadNote,
+  type LeadMessage,
+  type ReplyDraft,
   type LeadStatus,
 } from './api'
 
@@ -72,6 +79,10 @@ export function LeadWorkspace({ role, refreshKey = 0 }: LeadWorkspaceProps) {
   const [analysisLoading, setAnalysisLoading] = useState(false)
   const [analysisError, setAnalysisError] = useState('')
   const [analysisRetrying, setAnalysisRetrying] = useState(false)
+  const [leadMessages, setLeadMessages] = useState<LeadMessage[]>([])
+  const [replyDrafts, setReplyDrafts] = useState<ReplyDraft[]>([])
+  const [clarificationSaving, setClarificationSaving] = useState(false)
+  const [clarificationError, setClarificationError] = useState('')
 
   useEffect(() => {
     const controller = new AbortController()
@@ -126,21 +137,28 @@ export function LeadWorkspace({ role, refreshKey = 0 }: LeadWorkspaceProps) {
     setLeadEvents([])
     setLeadNotes([])
     setAnalysis(null)
+    setLeadMessages([])
+    setReplyDrafts([])
     setStatusError('')
     setOwnerError('')
     setNoteError('')
     setAnalysisError('')
+    setClarificationError('')
     try {
-      const [lead, events, notes, aiAnalysis] = await Promise.all([
+      const [lead, events, notes, aiAnalysis, messages, drafts] = await Promise.all([
         getLead(id),
         isCustomer ? Promise.resolve([]) : getLeadEvents(id),
         isCustomer ? Promise.resolve([]) : getLeadNotes(id),
         isCustomer ? Promise.resolve(null) : getAiAnalysis(id),
+        getLeadMessages(id),
+        isCustomer ? Promise.resolve([]) : getReplyDrafts(id),
       ])
       setSelectedLead(lead)
       setLeadEvents(events)
       setLeadNotes(notes)
       setAnalysis(aiAnalysis)
+      setLeadMessages(messages)
+      setReplyDrafts(drafts)
     } catch {
       setDetailError(true)
     } finally {
@@ -255,6 +273,48 @@ export function LeadWorkspace({ role, refreshKey = 0 }: LeadWorkspaceProps) {
     }
   }
 
+  async function saveReplyDraft(body: string, draft: ReplyDraft | null): Promise<void> {
+    if (!selectedLead || isCustomer || clarificationSaving) return
+    setClarificationSaving(true)
+    setClarificationError('')
+    try {
+      const saved = draft
+        ? await updateReplyDraft(selectedLead.id, draft.id, body, draft.version)
+        : await createReplyDraft(selectedLead.id, body)
+      setReplyDrafts((current) => [saved, ...current.filter((item) => item.id !== saved.id)])
+    } catch (requestError) {
+      if (requestError instanceof ApiError && requestError.status === 409) {
+        setClarificationError('The lead or draft changed. Reload the request and try again.')
+      } else {
+        setClarificationError('The reply draft could not be saved.')
+      }
+      throw requestError
+    } finally {
+      setClarificationSaving(false)
+    }
+  }
+
+  async function approveReplyDraft(draft: ReplyDraft): Promise<void> {
+    if (!selectedLead || isCustomer || clarificationSaving) return
+    setClarificationSaving(true)
+    setClarificationError('')
+    try {
+      const approved = await sendReplyDraft(selectedLead.id, draft.id, draft.version)
+      setReplyDrafts((current) => [approved, ...current.filter((item) => item.id !== approved.id)])
+      setLeadMessages(await getLeadMessages(selectedLead.id))
+    } catch (requestError) {
+      if (requestError instanceof ApiError && requestError.status === 422) {
+        setClarificationError('The customer must send /start to the bot before a question can be delivered.')
+      } else if (requestError instanceof ApiError && requestError.status === 409) {
+        setClarificationError('Another clarification is active or the draft changed. Reload and try again.')
+      } else {
+        setClarificationError('The clarification question could not be queued.')
+      }
+    } finally {
+      setClarificationSaving(false)
+    }
+  }
+
   return (
     <section className="lead-panel lead-workspace" aria-labelledby="lead-list-title">
       <div className="panel-heading workspace-heading">
@@ -314,6 +374,10 @@ export function LeadWorkspace({ role, refreshKey = 0 }: LeadWorkspaceProps) {
           analysisLoading={analysisLoading}
           analysisRetrying={analysisRetrying}
           analysisError={analysisError}
+          messages={leadMessages}
+          drafts={replyDrafts}
+          clarificationSaving={clarificationSaving}
+          clarificationError={clarificationError}
           managers={managers}
           managersError={managersError}
           ownerUpdating={ownerUpdating}
@@ -327,6 +391,8 @@ export function LeadWorkspace({ role, refreshKey = 0 }: LeadWorkspaceProps) {
           onNoteAdd={saveNote}
           onAnalysisRefresh={refreshAnalysis}
           onAnalysisRetry={retryAnalysis}
+          onDraftSave={saveReplyDraft}
+          onDraftSend={approveReplyDraft}
           onClose={() => setSelectedLead(null)}
         />
       )}
@@ -343,6 +409,10 @@ type LeadDetailProps = {
   analysisLoading: boolean
   analysisRetrying: boolean
   analysisError: string
+  messages: LeadMessage[]
+  drafts: ReplyDraft[]
+  clarificationSaving: boolean
+  clarificationError: string
   managers: AssignableManager[]
   managersError: boolean
   ownerUpdating: boolean
@@ -356,6 +426,8 @@ type LeadDetailProps = {
   onNoteAdd: (body: string) => Promise<void>
   onAnalysisRefresh: () => Promise<void>
   onAnalysisRetry: () => Promise<void>
+  onDraftSave: (body: string, draft: ReplyDraft | null) => Promise<void>
+  onDraftSend: (draft: ReplyDraft) => Promise<void>
   onClose: () => void
 }
 
@@ -368,6 +440,10 @@ function LeadDetail({
   analysisLoading,
   analysisRetrying,
   analysisError,
+  messages,
+  drafts,
+  clarificationSaving,
+  clarificationError,
   managers,
   managersError,
   ownerUpdating,
@@ -381,12 +457,17 @@ function LeadDetail({
   onNoteAdd,
   onAnalysisRefresh,
   onAnalysisRetry,
+  onDraftSave,
+  onDraftSend,
   onClose,
 }: LeadDetailProps) {
   const transitions = allowedTransitions[lead.status]
   const [nextStatus, setNextStatus] = useState<LeadStatus>(transitions[0] ?? lead.status)
   const [nextOwnerId, setNextOwnerId] = useState(lead.ownerId?.toString() ?? '')
   const [noteBody, setNoteBody] = useState('')
+  const editableDraft = drafts.find((draft) => draft.status === 'DRAFT') ?? null
+  const deliveryPending = drafts[0]?.status === 'APPROVED'
+  const [replyBody, setReplyBody] = useState(editableDraft?.body ?? analysis?.result?.suggestedQuestion ?? '')
   const managerNames = new Map(managers.map((manager) => [manager.id, manager.displayName]))
   const budget = lead.estimatedBudgetAmount === null
     ? 'Not specified'
@@ -398,6 +479,16 @@ function LeadDetail({
     try {
       await onNoteAdd(body)
       setNoteBody('')
+    } catch {
+      // The parent displays the request error and preserves the draft.
+    }
+  }
+
+  async function submitDraft() {
+    const body = replyBody.trim()
+    if (!body || clarificationSaving) return
+    try {
+      await onDraftSave(body, editableDraft)
     } catch {
       // The parent displays the request error and preserves the draft.
     }
@@ -516,6 +607,62 @@ function LeadDetail({
           {analysisError && <p className="form-error" role="alert">{analysisError}</p>}
         </div>
       )}
+
+      {canManage && lead.status === 'CLARIFICATION' && (
+        <div className="clarification-control">
+          <div>
+            <p className="eyebrow">Customer conversation</p>
+            <h4>Clarification question</h4>
+          </div>
+          <textarea
+            value={replyBody}
+            onChange={(event) => setReplyBody(event.target.value)}
+            maxLength={2000}
+            rows={4}
+            placeholder="Write a question for the customer"
+            disabled={clarificationSaving || deliveryPending}
+          />
+          <div className="note-actions">
+            <small>{replyBody.length}/2000</small>
+            <button
+              className="secondary-button"
+              type="button"
+              disabled={clarificationSaving || deliveryPending || replyBody.trim().length === 0}
+              onClick={submitDraft}
+            >
+              {clarificationSaving ? 'Saving…' : editableDraft ? 'Update draft' : 'Save draft'}
+            </button>
+            <button
+              className="primary-button"
+              type="button"
+              disabled={clarificationSaving || !editableDraft || replyBody.trim() !== editableDraft.body}
+              onClick={() => editableDraft && onDraftSend(editableDraft)}
+            >
+              Approve and send
+            </button>
+          </div>
+          {!editableDraft && drafts.length > 0 && (
+            <p className="empty-state">Latest delivery: {drafts[0].status.toLowerCase()}.</p>
+          )}
+          {clarificationError && <p className="form-error" role="alert">{clarificationError}</p>}
+        </div>
+      )}
+
+      <div className="conversation-history">
+        <p className="eyebrow">Conversation</p>
+        <h4>Customer messages</h4>
+        {messages.length === 0 && <p className="empty-state">No clarification messages yet.</p>}
+        {messages.map((message) => (
+          <div className={`conversation-item conversation-item--${message.kind.toLowerCase()}`} key={message.id}>
+            <strong>{message.kind === 'CUSTOMER_REPLY' ? 'Customer' : 'Manager'}</strong>
+            <p>{message.body}</p>
+            <small>
+              {dateFormatter.format(new Date(message.createdAt))}
+              {message.deliveryStatus ? ` · ${message.deliveryStatus.toLowerCase()}` : ''}
+            </small>
+          </div>
+        ))}
+      </div>
 
       {canManage && (
         <div className="note-control">

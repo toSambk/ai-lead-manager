@@ -9,6 +9,7 @@ import dev.aileadmanager.app.dto.LeadPageResponse
 import dev.aileadmanager.app.dto.LeadResponse
 import dev.aileadmanager.app.dto.AddLeadNoteRequest
 import dev.aileadmanager.app.dto.LeadNoteResponse
+import dev.aileadmanager.app.dto.LeadMessageResponse
 import dev.aileadmanager.app.security.CurrentUser
 import dev.aileadmanager.app.service.LeadStatusService
 import dev.aileadmanager.app.service.LeadAssignmentService
@@ -33,6 +34,9 @@ import dev.aileadmanager.core.usecase.AddLeadNoteUseCase
 import dev.aileadmanager.core.usecase.LeadNoteException
 import dev.aileadmanager.core.usecase.LeadNoteFailure
 import dev.aileadmanager.core.usecase.ListLeadNotesUseCase
+import dev.aileadmanager.core.usecase.ListLeadMessagesUseCase
+import dev.aileadmanager.core.usecase.LeadClarificationException
+import dev.aileadmanager.core.usecase.LeadClarificationFailure
 import jakarta.validation.Valid
 import java.net.URI
 import org.springframework.http.HttpStatus
@@ -59,6 +63,7 @@ class LeadController(
     private val listLeadEventsUseCase: ListLeadEventsUseCase,
     private val addLeadNoteUseCase: AddLeadNoteUseCase,
     private val listLeadNotesUseCase: ListLeadNotesUseCase,
+    private val listLeadMessagesUseCase: ListLeadMessagesUseCase,
     private val categories: ServiceCategoryRepository,
 ) {
     @PostMapping
@@ -203,7 +208,19 @@ class LeadController(
     }
 
     @GetMapping("/{id}/messages")
-    fun listMessages(): ResponseEntity<Void> = plannedEndpoint()
+    fun listMessages(
+        @PathVariable id: Long,
+        @AuthenticationPrincipal user: CurrentUser,
+    ): List<LeadMessageResponse> = try {
+        listLeadMessagesUseCase.list(id, user.toLeadReader()).map(LeadMessageResponse::from)
+    } catch (error: LeadClarificationException) {
+        val status = when (error.failure) {
+            LeadClarificationFailure.LEAD_NOT_FOUND -> HttpStatus.NOT_FOUND
+            LeadClarificationFailure.FORBIDDEN -> HttpStatus.FORBIDDEN
+            else -> HttpStatus.CONFLICT
+        }
+        throw ResponseStatusException(status, error.message, error)
+    }
 
     private fun CurrentUser.toLeadReader() = LeadReader(id, role)
 

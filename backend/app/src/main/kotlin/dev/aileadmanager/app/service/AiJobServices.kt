@@ -12,6 +12,7 @@ import dev.aileadmanager.core.LeadEvent
 import dev.aileadmanager.core.LeadEventRepository
 import dev.aileadmanager.core.LeadEventType
 import dev.aileadmanager.core.LeadRepository
+import dev.aileadmanager.core.LeadMessageRepository
 import dev.aileadmanager.core.LeadStatus
 import dev.aileadmanager.core.ServiceCategoryRepository
 import dev.aileadmanager.core.usecase.AiAnalysisValidator
@@ -111,6 +112,7 @@ class AiJobFailureService(
 class AiJobProcessor(
     private val leads: LeadRepository,
     private val categories: ServiceCategoryRepository,
+    private val messages: LeadMessageRepository,
     private val provider: AiProvider,
     private val validator: AiAnalysisValidator,
     private val completion: AiAnalysisCompletionService,
@@ -125,7 +127,11 @@ class AiJobProcessor(
             }
             val category = categories.findById(lead.categoryId)
                 ?: error("Category ${lead.categoryId} referenced by lead ${lead.id} was not found")
-            val draft = provider.analyze(AiAnalysisInput(lead, category))
+            val draft = provider.analyze(AiAnalysisInput(
+                lead = lead,
+                category = category,
+                conversation = messages.findConversationByLeadId(job.leadId),
+            ))
             completion.complete(job, validator.validate(job, draft))
         } catch (error: AiProviderException) {
             log.warn("AI job {} failed with provider error {}", job.id, error.errorCode, error)

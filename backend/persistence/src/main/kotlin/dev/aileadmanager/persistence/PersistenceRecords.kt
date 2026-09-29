@@ -4,6 +4,7 @@ import dev.aileadmanager.core.Lead
 import dev.aileadmanager.core.LeadEvent
 import dev.aileadmanager.core.LeadEventType
 import dev.aileadmanager.core.LeadMessage
+import dev.aileadmanager.core.LeadMessageDeliveryStatus
 import dev.aileadmanager.core.LeadMessageKind
 import dev.aileadmanager.core.LeadStatus
 import dev.aileadmanager.core.ServiceCategory
@@ -92,6 +93,9 @@ internal data class LeadMessageRecord(
     val senderId: Long?,
     val kind: LeadMessageKind,
     val body: String,
+    val deliveryStatus: LeadMessageDeliveryStatus?,
+    val telegramChatId: Long?,
+    val telegramMessageId: Long?,
     val createdAt: Instant,
 ) {
     fun toDomain() = LeadMessage(
@@ -100,6 +104,9 @@ internal data class LeadMessageRecord(
         senderId = senderId,
         kind = kind,
         body = body,
+        deliveryStatus = deliveryStatus,
+        telegramChatId = telegramChatId,
+        telegramMessageId = telegramMessageId,
         createdAt = createdAt,
     )
 }

@@ -1,6 +1,6 @@
 # Data model and persistence boundary
 
-This document defines the PostgreSQL schema. The foundation tables are implemented by Liquibase change set `001-foundation`, JDBC session tables by `002-sessions`, append-only lead audit events by `003-lead-events`, lead messages for internal notes by `004-lead-messages`, and AI job/result storage by `005-ai-analysis` in `backend/persistence/src/main/resources/db/changelog/changes`. Additional business tables remain planned and should be added only when the related workflow is implemented.
+This document defines the PostgreSQL schema. The foundation tables are implemented by Liquibase change set `001-foundation`, JDBC session tables by `002-sessions`, append-only lead audit events by `003-lead-events`, lead messages by `004-lead-messages`, AI job/result storage by `005-ai-analysis`, Telegram reliability storage by `006-telegram-delivery`, and the clarification workflow by `007-lead-clarification` in `backend/persistence/src/main/resources/db/changelog/changes`. Additional business tables remain planned and should be added only when the related workflow is implemented.
 
 The design follows the first release in [README.md](../README.md): one business, Telegram as the only inbound channel, and one Spring Boot service. PostgreSQL is the source of truth for leads and their history. The frontend never accesses it directly.
 
@@ -26,13 +26,17 @@ These tables are introduced incrementally with their workflows. The table below 
 
 | Table | Key fields and constraints | Added with |
 | --- | --- | --- |
-| `lead_messages` | PK, `lead_id` FK, `sender_id` nullable FK, `kind` (`CUSTOMER_REPLY`, `MANAGER_REPLY`, `FOLLOW_UP_QUESTION`, `INTERNAL_NOTE`), body, and creation time. Internal notes must never enter the outgoing Telegram path. Telegram identifiers, approval, and delivery state will be added when customer conversations are implemented. | Implemented for internal notes; customer messages remain planned. |
+| `lead_messages` | PK, `lead_id` FK, `sender_id` nullable FK, `kind` (`CUSTOMER_REPLY`, `MANAGER_REPLY`, `FOLLOW_UP_QUESTION`, `INTERNAL_NOTE`), body, optional delivery state, optional unique Telegram chat/message identity, and creation time. Internal notes never enter the outgoing Telegram path. Customers see only their replies and successfully delivered questions. | Implemented. |
+| `reply_drafts` | PK, lead and author FKs, body, state (`DRAFT`, `APPROVED`, `SENT`, `FAILED`), optimistic version, approval/send timestamps. Only a manager or administrator can approve a draft. | Implemented for clarification questions. |
+| `telegram_conversations` | PK, customer, lead, and question message FKs, state (`PENDING_DELIVERY`, `AWAITING_REPLY`, `ANSWERED`, `CANCELLED`), timestamps. A partial unique index permits one active conversation per customer. | Implemented. |
 | `lead_events` | PK, `lead_id` FK, `actor_id` nullable FK, event type, old/new status or owner IDs as applicable, creation time. Insert in the same transaction as each status or owner change. Keep history append-only. | Implemented for status and owner changes. |
-| `telegram_updates` | `update_id bigint` PK, processing state and timestamps. Claim each update before applying its effects; a repeated update ID must not create another lead/message. Store only the fields needed for processing and diagnostics, not a raw token. | Telegram integration |
+| `telegram_updates` | `update_id bigint` PK, update type, diagnostic JSON payload, received time, and processed time. Inserting the update ID claims it before effects are applied; a repeated update ID is ignored. Bot tokens and webhook secrets are never stored. | Implemented. |
+| `telegram_chat_bindings` | `user_id bigint` PK/FK, unique `telegram_chat_id`, chat type, and update time. Only a private Telegram chat is currently bound to a verified local user. | Implemented. |
+| `telegram_delivery_jobs` | PK, unique message key, delivery type, chat ID, optional lead FK, text, optional button, state (`PENDING`, `RUNNING`, `SUCCEEDED`, `FAILED`), attempts, scheduling, lease, bounded error details, optional Telegram message ID, and timestamps. Due jobs are claimed with `SKIP LOCKED`. | Implemented for command replies, manager notifications, and lead confirmations. |
 | `ai_jobs` | PK, `lead_id` FK, state (`PENDING`, `RUNNING`, `SUCCEEDED`, `FAILED`), attempt count and limit, next attempt time, lease fields, bounded error code/message, timestamps. A partial unique index permits one active job per lead. | Implemented. |
 | `ai_results` | PK, unique `job_id` FK, `lead_id` FK, summary, JSON extracted facts and missing fields, suggested question, priority and reason, creation time. Invalid provider output is never stored as successful. | Implemented. |
 
-When customer-facing messages are implemented, represent draft, approval, and delivery separately so a send retry cannot bypass manager approval. Use a unique Telegram message/update key where available, and record the send outcome. The exact delivery transaction and retry contract should be finalized with the bot workflow.
+When customer-facing manager replies are implemented, represent draft, approval, and delivery separately so a send retry cannot bypass manager approval. The delivery queue already uses a unique message key and records the send outcome. It provides durable, bounded delivery attempts after a successful enqueue. An ambiguous network failure after Telegram accepted `sendMessage` can still produce a duplicate when the job is retried because Telegram does not accept an application idempotency key for that method.
 
 ## Persistence module responsibility
 
@@ -49,8 +53,9 @@ Repository operations now support saving a lead, finding one by ID or by ID plus
 1. **V1 foundation (implemented):** Liquibase creates `users`, `service_categories`, and `leads`, including FKs, checks, indexes, and safe category seed data. Spring Data JDBC repository adapters provide storage. Lead create, paginated list, and detail operations use the verified session and enforce customer ownership.
 2. **V2 sessions (implemented):** Liquibase creates `public.spring_session` and `public.spring_session_attributes`. Spring Session JDBC stores server-side sessions there; Spring Security loads the user's current role from `users` on each request.
 3. **V3 lead events (implemented):** add append-only status and owner event storage. Status and owner changes use it now.
-4. **V4 lead messages (partially implemented):** add append-only messages and implement manager-only internal notes. Customer messages, approval, and delivery metadata remain planned.
-5. **Telegram reliability:** add update deduplication and outbound delivery state with unique keys.
-6. **V5 AI analysis (implemented with local stub):** add jobs, leases, bounded persisted retries, validated results, manual retry, and stale-job recovery. A remote provider remains planned.
+4. **V4 lead messages (implemented and extended by V7):** add append-only messages for internal notes and customer conversations.
+5. **V5 AI analysis (implemented with local stub):** add jobs, leases, bounded persisted retries, validated results, manual retry, and stale-job recovery. A remote provider remains planned.
+6. **V6 Telegram delivery (implemented):** add update deduplication, private chat bindings, and outbound delivery jobs with unique message keys, leases, bounded retries, terminal failure state, and stale-job recovery.
+7. **V7 lead clarification (implemented):** add reply drafts, delivery metadata on lead messages, active conversation state, manager approval, customer reply association, and repeat AI analysis.
 
 Each migration is forward-only and versioned. Do not place schema creation in application startup code or expose database models directly as API responses.

@@ -151,7 +151,10 @@ internal class JdbcLeadEventRepository(private val records: SpringLeadEventRepos
 }
 
 @Repository
-internal class JdbcLeadMessageRepository(private val records: SpringLeadMessageRepository) : LeadMessageRepository {
+internal class JdbcLeadMessageRepository(
+    private val records: SpringLeadMessageRepository,
+    private val jdbc: org.springframework.jdbc.core.JdbcTemplate,
+) : LeadMessageRepository {
     override fun save(message: LeadMessage): LeadMessage {
         val createdAt = message.createdAt ?: Instant.now().truncatedTo(ChronoUnit.MICROS)
         return records.save(LeadMessageRecord(
@@ -160,6 +163,9 @@ internal class JdbcLeadMessageRepository(private val records: SpringLeadMessageR
             senderId = message.senderId,
             kind = message.kind,
             body = message.body,
+            deliveryStatus = message.deliveryStatus,
+            telegramChatId = message.telegramChatId,
+            telegramMessageId = message.telegramMessageId,
             createdAt = createdAt,
         )).toDomain()
     }
@@ -167,4 +173,34 @@ internal class JdbcLeadMessageRepository(private val records: SpringLeadMessageR
     override fun findInternalNotesByLeadId(leadId: Long): List<LeadMessage> =
         records.findByLeadIdAndKindOrderByCreatedAtDescIdDesc(leadId, LeadMessageKind.INTERNAL_NOTE)
             .map(LeadMessageRecord::toDomain)
+
+    override fun findConversationByLeadId(leadId: Long): List<LeadMessage> =
+        records.findByLeadIdAndKindNotOrderByCreatedAtAscIdAsc(leadId, LeadMessageKind.INTERNAL_NOTE)
+            .map(LeadMessageRecord::toDomain)
+
+    override fun markDeliverySucceeded(messageId: Long, telegramChatId: Long, telegramMessageId: Long) {
+        val changed = jdbc.update(
+            """
+            UPDATE "AI_LEAD_MANAGER".lead_messages
+            SET delivery_status = 'SENT', telegram_chat_id = ?, telegram_message_id = ?
+            WHERE id = ? AND delivery_status = 'PENDING'
+            """.trimIndent(),
+            telegramChatId,
+            telegramMessageId,
+            messageId,
+        )
+        check(changed == 1) { "Lead message $messageId is not pending delivery" }
+    }
+
+    override fun markDeliveryFailed(messageId: Long) {
+        val changed = jdbc.update(
+            """
+            UPDATE "AI_LEAD_MANAGER".lead_messages
+            SET delivery_status = 'FAILED'
+            WHERE id = ? AND delivery_status = 'PENDING'
+            """.trimIndent(),
+            messageId,
+        )
+        check(changed == 1) { "Lead message $messageId is not pending delivery" }
+    }
 }

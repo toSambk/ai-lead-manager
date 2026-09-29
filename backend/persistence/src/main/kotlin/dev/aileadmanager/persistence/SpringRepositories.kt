@@ -29,4 +29,8 @@ internal interface SpringLeadMessageRepository : CrudRepository<LeadMessageRecor
         leadId: Long,
         kind: dev.aileadmanager.core.LeadMessageKind,
     ): List<LeadMessageRecord>
+    fun findByLeadIdAndKindNotOrderByCreatedAtAscIdAsc(
+        leadId: Long,
+        kind: dev.aileadmanager.core.LeadMessageKind,
+    ): List<LeadMessageRecord>
 }
