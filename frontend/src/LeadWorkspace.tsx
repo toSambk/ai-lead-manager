@@ -53,6 +53,10 @@ const allowedTransitions: Record<LeadStatus, LeadStatus[]> = {
   REJECTED: [],
 }
 
+function formatAnalysisSummary(summary: string): string {
+  return summary.replace(/\s+Customer clarification:\s*/u, '\n\nCustomer clarification: ')
+}
+
 export function LeadWorkspace({ role, refreshKey = 0 }: LeadWorkspaceProps) {
   const isCustomer = role === 'CUSTOMER'
   const [page, setPage] = useState(0)
@@ -579,7 +583,7 @@ function LeadDetail({
           </div>
           {analysis?.result ? (
             <div className="ai-result">
-              <p>{analysis.result.summary}</p>
+              <p>{formatAnalysisSummary(analysis.result.summary)}</p>
               <dl>
                 <div><dt>Priority</dt><dd>{analysis.result.priority}</dd></div>
                 <div><dt>Reason</dt><dd>{analysis.result.priorityReason}</dd></div>

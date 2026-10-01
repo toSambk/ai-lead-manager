@@ -1,4 +1,4 @@
-package dev.aileadmanager.app.service
+package dev.aileadmanager.app.service.telegram
 
 import dev.aileadmanager.core.TelegramDeliveryErrorCode
 import dev.aileadmanager.core.TelegramDeliveryJob

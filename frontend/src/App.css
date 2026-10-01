@@ -258,12 +258,13 @@ h1 {
 .note-item { padding: 12px 14px; border-radius: 10px; background: #fff8e8; }
 .note-item p { margin: 0 0 6px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
 .note-item small { color: #7a8494; }
-.ai-analysis-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.ai-state { padding: 5px 9px; border-radius: 999px; background: #eef1f5; color: #596579; font-size: 11px; font-weight: 750; }
+.ai-analysis-heading { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.ai-analysis-heading > div { min-width: 0; }
+.ai-state { flex: 0 0 auto; padding: 5px 9px; border-radius: 999px; background: #eef1f5; color: #596579; font-size: 11px; font-weight: 750; white-space: nowrap; }
 .ai-state--succeeded { background: #e8f7ee; color: #237342; }
 .ai-state--failed { background: #fcebed; color: #a43845; }
 .ai-state--running { background: #e8f1ff; color: #2f62a8; }
-.ai-result > p { margin: 0 0 16px; line-height: 1.6; }
+.ai-result > p { margin: 0 0 16px; overflow-wrap: anywhere; white-space: pre-wrap; line-height: 1.6; }
 .ai-result dl { margin-top: 0; }
 .ai-actions { display: flex; gap: 10px; margin-top: 16px; }
 .ai-actions .primary-button, .ai-actions .secondary-button { width: auto; }

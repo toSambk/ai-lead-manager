@@ -1,4 +1,4 @@
-package dev.aileadmanager.app.service
+package dev.aileadmanager.app.service.lead
 
 import dev.aileadmanager.core.usecase.AssignLeadOwnerCommand
 import dev.aileadmanager.core.usecase.AssignLeadOwnerException

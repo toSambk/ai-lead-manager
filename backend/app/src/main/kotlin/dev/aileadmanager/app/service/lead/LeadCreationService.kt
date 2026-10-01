@@ -1,5 +1,6 @@
-package dev.aileadmanager.app.service
+package dev.aileadmanager.app.service.lead
 
+import dev.aileadmanager.app.service.telegram.TelegramNotificationService
 import dev.aileadmanager.core.Lead
 import dev.aileadmanager.core.usecase.CreateLeadCommand
 import dev.aileadmanager.core.usecase.CreateLeadUseCase

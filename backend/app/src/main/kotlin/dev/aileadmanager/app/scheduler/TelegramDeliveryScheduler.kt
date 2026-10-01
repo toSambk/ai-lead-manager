@@ -1,5 +1,7 @@
-package dev.aileadmanager.app.service
+package dev.aileadmanager.app.scheduler
 
+import dev.aileadmanager.app.service.telegram.TelegramDeliveryClaimService
+import dev.aileadmanager.app.service.telegram.TelegramDeliveryProcessor
 import java.net.InetAddress
 import java.time.Duration
 import java.util.UUID

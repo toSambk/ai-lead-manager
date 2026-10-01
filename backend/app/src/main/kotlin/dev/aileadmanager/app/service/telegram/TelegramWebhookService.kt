@@ -1,5 +1,6 @@
-package dev.aileadmanager.app.service
+package dev.aileadmanager.app.service.telegram
 
+import dev.aileadmanager.app.service.lead.LeadClarificationService
 import dev.aileadmanager.core.TelegramChatBindingRepository
 import dev.aileadmanager.core.TelegramUpdateRepository
 import dev.aileadmanager.core.UserRepository
@@ -37,9 +38,10 @@ class TelegramWebhookService(
             chats.savePrivateChat(checkNotNull(user.id), message.chat.id, now)
             user
         } else null
+        val includeMiniAppButton = message.chat.type == "private"
         when (message.botCommand()) {
-            "/start" -> notifications.enqueueStartReply(updateId, message.chat.id)
-            "/help" -> notifications.enqueueHelpReply(updateId, message.chat.id)
+            "/start" -> notifications.enqueueStartReply(updateId, message.chat.id, includeMiniAppButton)
+            "/help" -> notifications.enqueueHelpReply(updateId, message.chat.id, includeMiniAppButton)
             null -> if (user != null && !message.text.isNullOrBlank()) {
                 val replyText = checkNotNull(message.text)
                 clarifications.recordCustomerReply(
@@ -49,7 +51,7 @@ class TelegramWebhookService(
                     text = replyText,
                 )
             } else Unit
-            else -> notifications.enqueueHelpReply(updateId, message.chat.id)
+            else -> notifications.enqueueHelpReply(updateId, message.chat.id, includeMiniAppButton)
         }
     }
 }

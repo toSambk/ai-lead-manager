@@ -11,14 +11,14 @@ import dev.aileadmanager.app.dto.AddLeadNoteRequest
 import dev.aileadmanager.app.dto.LeadNoteResponse
 import dev.aileadmanager.app.dto.LeadMessageResponse
 import dev.aileadmanager.app.security.CurrentUser
-import dev.aileadmanager.app.service.LeadStatusService
-import dev.aileadmanager.app.service.LeadAssignmentService
+import dev.aileadmanager.app.service.lead.LeadStatusService
+import dev.aileadmanager.app.service.lead.LeadAssignmentService
 import dev.aileadmanager.core.Lead
 import dev.aileadmanager.core.ServiceCategoryRepository
 import dev.aileadmanager.core.usecase.CreateLeadCommand
 import dev.aileadmanager.core.usecase.CreateLeadException
 import dev.aileadmanager.core.usecase.CreateLeadFailure
-import dev.aileadmanager.app.service.LeadCreationService
+import dev.aileadmanager.app.service.lead.LeadCreationService
 import dev.aileadmanager.core.usecase.ChangeLeadStatusCommand
 import dev.aileadmanager.core.usecase.ChangeLeadStatusException
 import dev.aileadmanager.core.usecase.ChangeLeadStatusFailure

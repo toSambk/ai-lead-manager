@@ -40,7 +40,7 @@ class StubAiProvider : AiProvider {
             summary = buildString {
                 append("${input.category.name}: ${lead.description.take(400)}")
                 input.conversation.lastOrNull { it.kind == LeadMessageKind.CUSTOMER_REPLY }?.let {
-                    append(" Customer clarification: ${it.body.take(250)}")
+                    append("\n\nCustomer clarification: ${it.body.take(250)}")
                 }
             },
             extractedFacts = AiExtractedFacts(

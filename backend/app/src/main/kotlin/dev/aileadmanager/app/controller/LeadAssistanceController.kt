@@ -6,9 +6,9 @@ import dev.aileadmanager.app.dto.ReplyDraftResponse
 import dev.aileadmanager.app.dto.SendReplyDraftRequest
 import dev.aileadmanager.app.dto.UpdateReplyDraftRequest
 import dev.aileadmanager.app.security.CurrentUser
-import dev.aileadmanager.app.service.AiAnalysisService
-import dev.aileadmanager.app.service.LeadClarificationService
-import dev.aileadmanager.app.service.ReplyDraftService
+import dev.aileadmanager.app.service.ai.AiAnalysisService
+import dev.aileadmanager.app.service.lead.LeadClarificationService
+import dev.aileadmanager.app.service.lead.ReplyDraftService
 import dev.aileadmanager.core.usecase.AiAnalysisException
 import dev.aileadmanager.core.usecase.AiAnalysisFailure
 import dev.aileadmanager.core.usecase.GetLeadAiAnalysisUseCase

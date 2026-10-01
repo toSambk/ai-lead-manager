@@ -1,4 +1,4 @@
-package dev.aileadmanager.app.service
+package dev.aileadmanager.app.service.ai
 
 import dev.aileadmanager.core.AiAnalysisInput
 import dev.aileadmanager.core.AiAnalysisResult

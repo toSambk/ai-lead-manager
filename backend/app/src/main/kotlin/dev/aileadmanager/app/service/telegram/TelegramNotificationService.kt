@@ -1,4 +1,4 @@
-package dev.aileadmanager.app.service
+package dev.aileadmanager.app.service.telegram
 
 import dev.aileadmanager.app.config.TelegramRuntimeSettings
 import dev.aileadmanager.core.Lead
@@ -36,8 +36,6 @@ class TelegramNotificationService(
                 chatId = chatId,
                 leadId = leadId,
                 text = "New lead $reference\n\nCategory: ${category.name}\nStatus: New\nCustomer: ${customer.displayName}",
-                buttonText = settings.miniAppUrl?.let { "Open Lead Manager" },
-                buttonUrl = settings.miniAppUrl,
                 nextAttemptAt = now,
             ))
         }
@@ -55,27 +53,29 @@ class TelegramNotificationService(
         }
     }
 
-    fun enqueueStartReply(updateId: Long, chatId: Long) {
+    fun enqueueStartReply(updateId: Long, chatId: Long, includeMiniAppButton: Boolean) {
         val now = Instant.now(clock)
+        val miniAppUrl = settings.miniAppUrl.takeIf { includeMiniAppButton }
         jobs.enqueue(TelegramDeliveryJob(
             messageKey = "START_REPLY:$updateId",
             type = TelegramDeliveryType.START_REPLY,
             chatId = chatId,
             text = "Welcome to AI Lead Manager.\n\nSubmit your request and our team will review it.",
-            buttonText = settings.miniAppUrl?.let { "Submit a request" },
-            buttonUrl = settings.miniAppUrl,
+            buttonText = miniAppUrl?.let { "Submit a request" },
+            buttonUrl = miniAppUrl,
             nextAttemptAt = now,
         ))
     }
 
-    fun enqueueHelpReply(updateId: Long, chatId: Long) {
+    fun enqueueHelpReply(updateId: Long, chatId: Long, includeMiniAppButton: Boolean) {
+        val miniAppUrl = settings.miniAppUrl.takeIf { includeMiniAppButton }
         jobs.enqueue(TelegramDeliveryJob(
             messageKey = "HELP_REPLY:$updateId",
             type = TelegramDeliveryType.HELP_REPLY,
             chatId = chatId,
             text = "Use Submit a request to create a new request. You can track your requests in the Mini App.",
-            buttonText = settings.miniAppUrl?.let { "Submit a request" },
-            buttonUrl = settings.miniAppUrl,
+            buttonText = miniAppUrl?.let { "Submit a request" },
+            buttonUrl = miniAppUrl,
             nextAttemptAt = Instant.now(clock),
         ))
     }

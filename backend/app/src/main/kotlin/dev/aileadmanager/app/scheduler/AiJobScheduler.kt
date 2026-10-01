@@ -1,5 +1,7 @@
-package dev.aileadmanager.app.service
+package dev.aileadmanager.app.scheduler
 
+import dev.aileadmanager.app.service.ai.AiJobClaimService
+import dev.aileadmanager.app.service.ai.AiJobProcessor
 import java.net.InetAddress
 import java.time.Duration
 import java.util.UUID

@@ -1,6 +1,6 @@
 package dev.aileadmanager.app.controller
 
-import dev.aileadmanager.app.service.TelegramWebhookService
+import dev.aileadmanager.app.service.telegram.TelegramWebhookService
 import dev.aileadmanager.telegram.InvalidTelegramUpdate
 import dev.aileadmanager.telegram.InvalidTelegramWebhookSecret
 import dev.aileadmanager.telegram.TelegramWebhookSecretVerifier

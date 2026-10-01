@@ -1,9 +1,9 @@
 package dev.aileadmanager.app
 
-import dev.aileadmanager.app.service.LeadCreationService
-import dev.aileadmanager.app.service.LeadClarificationService
-import dev.aileadmanager.app.service.ReplyDraftService
-import dev.aileadmanager.app.service.TelegramDeliveryCompletionService
+import dev.aileadmanager.app.service.lead.LeadCreationService
+import dev.aileadmanager.app.service.lead.LeadClarificationService
+import dev.aileadmanager.app.service.lead.ReplyDraftService
+import dev.aileadmanager.app.service.telegram.TelegramDeliveryCompletionService
 import dev.aileadmanager.core.TelegramDeliveryJobRepository
 import dev.aileadmanager.core.UserRole
 import dev.aileadmanager.core.usecase.CreateLeadCommand

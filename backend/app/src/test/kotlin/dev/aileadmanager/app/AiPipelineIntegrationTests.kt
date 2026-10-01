@@ -1,8 +1,8 @@
 package dev.aileadmanager.app
 
-import dev.aileadmanager.app.service.AiJobClaimService
-import dev.aileadmanager.app.service.AiJobProcessor
-import dev.aileadmanager.app.service.AiJobFailureService
+import dev.aileadmanager.app.service.ai.AiJobClaimService
+import dev.aileadmanager.app.service.ai.AiJobProcessor
+import dev.aileadmanager.app.service.ai.AiJobFailureService
 import dev.aileadmanager.core.AiJobErrorCode
 import dev.aileadmanager.core.AiAnalysisResultRepository
 import dev.aileadmanager.core.AiJobRepository

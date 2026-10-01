@@ -1,4 +1,4 @@
-package dev.aileadmanager.app.service
+package dev.aileadmanager.app.service.ai
 
 import dev.aileadmanager.core.AiJob
 import dev.aileadmanager.core.UserRole
