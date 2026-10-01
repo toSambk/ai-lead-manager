@@ -1,7 +1,5 @@
 package dev.aileadmanager.app.config
 
-import dev.aileadmanager.ai.StubAiProvider
-import dev.aileadmanager.core.AiProvider
 import java.time.Clock
 import java.util.concurrent.Executor
 import org.springframework.beans.factory.annotation.Value
@@ -15,12 +13,6 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 class AiConfiguration {
     @Bean
     fun clock(): Clock = Clock.systemUTC()
-
-    @Bean
-    fun aiProvider(@Value("\${ai.provider:stub}") provider: String): AiProvider = when (provider) {
-        "stub" -> StubAiProvider()
-        else -> error("Unsupported AI provider: $provider")
-    }
 
     @Bean("aiJobExecutor")
     fun aiJobExecutor(@Value("\${ai.worker.concurrency:2}") concurrency: Int): Executor =

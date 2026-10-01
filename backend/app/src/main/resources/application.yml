@@ -1,6 +1,15 @@
 spring:
   application:
     name: ai-lead-manager
+  ai:
+    model:
+      chat: ${AI_PROVIDER:stub}
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      max-retries: 0
+      timeout: ${OPENAI_TIMEOUT:60s}
+      chat:
+        model: ${OPENAI_MODEL:gpt-5-mini}
   datasource:
     url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:ai_lead_manager}
     username: ${POSTGRES_USER:ai_lead_manager}
